@@ -5,6 +5,7 @@
  * Window Weather Notifier API
  * OpenAPI spec version: 0.1.0
  */
+import type { CurrentWeatherPollenLevel } from "./currentWeatherPollenLevel";
 
 export interface CurrentWeather {
   temperature: number;
@@ -13,6 +14,9 @@ export interface CurrentWeather {
   weatherCode: number;
   weatherDescription: string;
   precipitationProbability: number;
+  airQualityIndex: number;
+  pollenLevel: CurrentWeatherPollenLevel;
+  timeOfDayTip: string;
   isWindowFriendly: boolean;
   recommendation: string;
   reasons: string[];

@@ -9,6 +9,16 @@ export interface HealthStatus {
   status: string;
 }
 
+export type CurrentWeatherPollenLevel =
+  (typeof CurrentWeatherPollenLevel)[keyof typeof CurrentWeatherPollenLevel];
+
+export const CurrentWeatherPollenLevel = {
+  low: "low",
+  moderate: "moderate",
+  high: "high",
+  "very-high": "very-high",
+} as const;
+
 export interface CurrentWeather {
   temperature: number;
   humidity: number;
@@ -16,11 +26,24 @@ export interface CurrentWeather {
   weatherCode: number;
   weatherDescription: string;
   precipitationProbability: number;
+  airQualityIndex: number;
+  pollenLevel: CurrentWeatherPollenLevel;
+  timeOfDayTip: string;
   isWindowFriendly: boolean;
   recommendation: string;
   reasons: string[];
   timestamp: string;
 }
+
+export type HourlyWeatherPollenLevel =
+  (typeof HourlyWeatherPollenLevel)[keyof typeof HourlyWeatherPollenLevel];
+
+export const HourlyWeatherPollenLevel = {
+  low: "low",
+  moderate: "moderate",
+  high: "high",
+  "very-high": "very-high",
+} as const;
 
 export interface HourlyWeather {
   hour: number;
@@ -30,6 +53,8 @@ export interface HourlyWeather {
   isWindowFriendly: boolean;
   weatherCode: number;
   precipitationProbability: number;
+  airQualityIndex: number;
+  pollenLevel: HourlyWeatherPollenLevel;
 }
 
 export interface WeatherForecast {
@@ -54,6 +79,8 @@ export interface Settings {
   maxHumidity: number;
   maxWindSpeed: number;
   maxRainChance: number;
+  maxAqi: number;
+  indoorTemp: number;
   workDays: number[];
   workStartHour: number;
   workEndHour: number;
@@ -70,6 +97,8 @@ export interface SettingsUpdate {
   maxHumidity?: number;
   maxWindSpeed?: number;
   maxRainChance?: number;
+  maxAqi?: number;
+  indoorTemp?: number;
   workDays?: number[];
   workStartHour?: number;
   workEndHour?: number;

@@ -5,6 +5,7 @@
  * Window Weather Notifier API
  * OpenAPI spec version: 0.1.0
  */
+import type { HourlyWeatherPollenLevel } from "./hourlyWeatherPollenLevel";
 
 export interface HourlyWeather {
   hour: number;
@@ -14,4 +15,6 @@ export interface HourlyWeather {
   isWindowFriendly: boolean;
   weatherCode: number;
   precipitationProbability: number;
+  airQualityIndex: number;
+  pollenLevel: HourlyWeatherPollenLevel;
 }

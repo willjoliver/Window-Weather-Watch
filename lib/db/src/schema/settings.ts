@@ -9,6 +9,8 @@ export const settingsTable = pgTable("settings", {
   maxHumidity: real("max_humidity").notNull().default(70),
   maxWindSpeed: real("max_wind_speed").notNull().default(20),
   maxRainChance: integer("max_rain_chance").notNull().default(40),
+  maxAqi: integer("max_aqi").notNull().default(50),
+  indoorTemp: real("indoor_temp").notNull().default(72),
   workDays: jsonb("work_days").notNull().$type<number[]>().default([1, 2, 3, 4, 5]),
   workStartHour: integer("work_start_hour").notNull().default(8),
   workEndHour: integer("work_end_hour").notNull().default(18),

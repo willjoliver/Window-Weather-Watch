@@ -4,6 +4,8 @@ import { db } from "@workspace/db";
 
 const router = Router();
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 function getWeatherDescription(code: number): string {
   if (code === 0) return "Clear sky";
   if (code <= 2) return "Partly cloudy";
@@ -17,47 +19,140 @@ function getWeatherDescription(code: number): string {
   return "Severe thunderstorm";
 }
 
-function isWindowFriendly(
+function classifyAqi(aqi: number): "good" | "moderate" | "unhealthy-sensitive" | "unhealthy" {
+  if (aqi <= 50) return "good";
+  if (aqi <= 100) return "moderate";
+  if (aqi <= 150) return "unhealthy-sensitive";
+  return "unhealthy";
+}
+
+function classifyPollen(birch: number | null, grass: number | null): "low" | "moderate" | "high" | "very-high" {
+  const total = (birch ?? 0) + (grass ?? 0);
+  if (total < 10) return "low";
+  if (total < 50) return "moderate";
+  if (total < 200) return "high";
+  return "very-high";
+}
+
+type Settings = {
+  minTemp: number;
+  maxTemp: number;
+  maxHumidity: number;
+  maxWindSpeed: number;
+  maxRainChance: number;
+  maxAqi: number;
+  indoorTemp: number;
+};
+
+function analyzeConditions(
   temp: number,
   humidity: number,
   windSpeed: number,
   weatherCode: number,
   precipProbability: number,
-  settings: {
-    minTemp: number;
-    maxTemp: number;
-    maxHumidity: number;
-    maxWindSpeed: number;
-    maxRainChance: number;
-  }
-): { friendly: boolean; reasons: string[] } {
-  const reasons: string[] = [];
+  aqi: number,
+  pollenLevel: "low" | "moderate" | "high" | "very-high",
+  hour: number,
+  settings: Settings
+): { friendly: boolean; reasons: string[]; recommendation: string } {
+  const issues: string[] = [];
+  const positives: string[] = [];
 
+  const outdoorCoolerThanIndoor = temp < settings.indoorTemp;
+
+  // Temperature
   if (temp < settings.minTemp) {
-    reasons.push(`Too cold (${temp.toFixed(0)}°F, min is ${settings.minTemp}°F)`);
+    issues.push(`Too cold outside (${temp.toFixed(0)}°F, your min is ${settings.minTemp}°F)`);
+  } else if (temp > settings.maxTemp) {
+    issues.push(`Too warm outside (${temp.toFixed(0)}°F — importing this heat will make your AC work harder)`);
+  } else if (!outdoorCoolerThanIndoor) {
+    issues.push(`Outdoor air (${temp.toFixed(0)}°F) is warmer than your thermostat (${settings.indoorTemp}°F) — won't help cool the house`);
   }
-  if (temp > settings.maxTemp) {
-    reasons.push(`Too warm (${temp.toFixed(0)}°F, max is ${settings.maxTemp}°F)`);
-  }
+
+  // Humidity
   if (humidity > settings.maxHumidity) {
-    reasons.push(`Too humid (${humidity.toFixed(0)}%, max is ${settings.maxHumidity}%)`);
+    issues.push(`Too humid outside (${humidity.toFixed(0)}%) — will make your home feel sticky`);
   }
+
+  // Wind
   if (windSpeed > settings.maxWindSpeed) {
-    reasons.push(`Too windy (${windSpeed.toFixed(0)} mph, max is ${settings.maxWindSpeed} mph)`);
+    issues.push(`Too gusty (${windSpeed.toFixed(0)} mph)`);
+  } else if (windSpeed >= 3 && windSpeed <= settings.maxWindSpeed) {
+    positives.push(`light breeze (${windSpeed.toFixed(0)} mph) is good for cross-ventilation`);
   }
+
+  // Rain
   if (precipProbability > settings.maxRainChance) {
-    reasons.push(`${precipProbability}% chance of rain`);
+    issues.push(`${precipProbability}% chance of rain`);
   }
   if (weatherCode >= 50 && weatherCode <= 99) {
-    reasons.push("Precipitation or storms in the area");
+    issues.push("Precipitation or storms in the area");
   }
 
-  if (reasons.length === 0) {
-    reasons.push(`Conditions are ideal — ${temp.toFixed(0)}°F, ${humidity.toFixed(0)}% humidity`);
+  // Air quality
+  const aqiClass = classifyAqi(aqi);
+  if (aqiClass === "unhealthy") {
+    issues.push(`Air quality is unhealthy (AQI ${aqi})`);
+  } else if (aqiClass === "unhealthy-sensitive") {
+    issues.push(`Air quality is poor for sensitive groups (AQI ${aqi})`);
+  } else if (aqiClass === "moderate") {
+    issues.push(`Air quality is only moderate (AQI ${aqi})`);
   }
 
-  return { friendly: reasons.length === 1 && reasons[0].startsWith("Conditions are ideal"), reasons };
+  // Pollen
+  if (pollenLevel === "very-high") {
+    issues.push("Very high pollen — keep windows closed if anyone has allergies");
+  } else if (pollenLevel === "high") {
+    issues.push("High pollen count outside");
+  } else if (pollenLevel === "moderate") {
+    issues.push("Moderate pollen — may affect allergy sufferers");
+  }
+
+  const friendly = issues.length === 0;
+
+  // Build recommendation with time-of-day awareness
+  let recommendation: string;
+  if (friendly) {
+    if (hour >= 5 && hour < 10) {
+      recommendation = "Great morning window — flush the house with cool air before heat builds.";
+    } else if (hour >= 17 && hour <= 21) {
+      recommendation = positives.length > 0
+        ? `Good evening conditions — open opposite windows for cross-ventilation (${positives[0]}).`
+        : "Good evening conditions — open opposite windows to let the heat out.";
+    } else if (hour > 21 || hour < 5) {
+      recommendation = "Night air is good — consider opening windows for overnight cooling.";
+    } else {
+      recommendation = positives.length > 0
+        ? `Conditions are good right now — ${positives[0]}.`
+        : "Conditions are good — open your window.";
+    }
+  } else {
+    if (hour >= 10 && hour < 17 && (temp > settings.indoorTemp || humidity > settings.maxHumidity)) {
+      recommendation = "Midday heat and humidity — let your AC handle it. Try again this evening.";
+    } else if (issues.some((r) => r.includes("pollen") || r.includes("Air quality"))) {
+      recommendation = "Keep windows closed — outdoor air quality isn't good right now.";
+    } else if (issues.some((r) => r.includes("rain") || r.includes("Rain") || r.includes("Precipitation"))) {
+      recommendation = "Keep windows closed — rain is in the forecast.";
+    } else {
+      recommendation = "Keep your window closed for now.";
+    }
+  }
+
+  const reasons = friendly
+    ? [`Conditions are ideal — ${temp.toFixed(0)}°F, ${humidity.toFixed(0)}% humidity${positives.length > 0 ? `, ${positives[0]}` : ""}`]
+    : issues;
+
+  return { friendly, reasons, recommendation };
 }
+
+function getTimeOfDayTip(hour: number): string {
+  if (hour >= 5 && hour < 10) return "Morning is the best time to flush the house with cool air.";
+  if (hour >= 10 && hour < 17) return "Midday heat is building — keep windows closed and let AC work.";
+  if (hour >= 17 && hour <= 21) return "Evening conditions often improve — good time to check again.";
+  return "Overnight air is often the coolest — good for passive cooling.";
+}
+
+// ─── Data Fetching ──────────────────────────────────────────────────────────
 
 async function fetchOpenMeteo(lat: number, lon: number) {
   const url = [
@@ -68,26 +163,32 @@ async function fetchOpenMeteo(lat: number, lon: number) {
     `&timezone=auto&forecast_days=1`,
     `&temperature_unit=fahrenheit&wind_speed_unit=mph`,
   ].join("");
-
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch weather data");
   return res.json() as Promise<{
-    current: {
-      time: string;
-      temperature_2m: number;
-      relative_humidity_2m: number;
-      wind_speed_10m: number;
-      weather_code: number;
-    };
-    hourly: {
-      time: string[];
-      temperature_2m: number[];
-      relative_humidity_2m: number[];
-      wind_speed_10m: number[];
-      weather_code: number[];
-      precipitation_probability: number[];
-    };
+    current: { time: string; temperature_2m: number; relative_humidity_2m: number; wind_speed_10m: number; weather_code: number };
+    hourly: { time: string[]; temperature_2m: number[]; relative_humidity_2m: number[]; wind_speed_10m: number[]; weather_code: number[]; precipitation_probability: number[] };
   }>;
+}
+
+async function fetchAirQuality(lat: number, lon: number) {
+  try {
+    const url = [
+      `https://air-quality-api.open-meteo.com/v1/air-quality`,
+      `?latitude=${lat}&longitude=${lon}`,
+      `&current=us_aqi,birch_pollen,grass_pollen`,
+      `&hourly=us_aqi,birch_pollen,grass_pollen`,
+      `&timezone=auto&forecast_days=1`,
+    ].join("");
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return null;
+    return res.json() as Promise<{
+      current: { time: string; us_aqi: number | null; birch_pollen: number | null; grass_pollen: number | null };
+      hourly: { time: string[]; us_aqi: (number | null)[]; birch_pollen: (number | null)[]; grass_pollen: (number | null)[] };
+    }>;
+  } catch {
+    return null;
+  }
 }
 
 async function getSettings() {
@@ -99,27 +200,40 @@ async function getSettings() {
   return rows[0];
 }
 
+// ─── Routes ─────────────────────────────────────────────────────────────────
+
 router.get("/weather/current", async (req, res) => {
   const parsed = GetCurrentWeatherQueryParams.safeParse(req.query);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "lat and lon are required" });
-  }
-  const { lat, lon } = parsed.data;
-  const settings = await getSettings();
-  const data = await fetchOpenMeteo(lat, lon);
-  const { current, hourly } = data;
+  if (!parsed.success) return res.status(400).json({ error: "lat and lon are required" });
 
-  // Get precipitation probability for the current hour from hourly data
-  const nowStr = current.time.substring(0, 13); // "2026-05-03T13"
+  const { lat, lon } = parsed.data;
+  const [settings, weatherData, aqData] = await Promise.all([
+    getSettings(),
+    fetchOpenMeteo(lat, lon),
+    fetchAirQuality(lat, lon),
+  ]);
+
+  const { current, hourly } = weatherData;
+  const nowStr = current.time.substring(0, 13);
   const currentHourIdx = hourly.time.findIndex((t) => t.startsWith(nowStr));
   const precipProbability = currentHourIdx >= 0 ? (hourly.precipitation_probability[currentHourIdx] ?? 0) : 0;
 
-  const { friendly, reasons } = isWindowFriendly(
+  const aqi = aqData?.current?.us_aqi ?? 0;
+  const birchPollen = aqData?.current?.birch_pollen ?? null;
+  const grassPollen = aqData?.current?.grass_pollen ?? null;
+  const pollenLevel = classifyPollen(birchPollen, grassPollen);
+
+  const hour = new Date(current.time).getHours();
+
+  const { friendly, reasons, recommendation } = analyzeConditions(
     current.temperature_2m,
     current.relative_humidity_2m,
     current.wind_speed_10m,
     current.weather_code,
     precipProbability,
+    aqi,
+    pollenLevel,
+    hour,
     settings
   );
 
@@ -130,10 +244,11 @@ router.get("/weather/current", async (req, res) => {
     weatherCode: current.weather_code,
     weatherDescription: getWeatherDescription(current.weather_code),
     precipitationProbability: precipProbability,
+    airQualityIndex: aqi,
+    pollenLevel,
+    timeOfDayTip: getTimeOfDayTip(hour),
     isWindowFriendly: friendly,
-    recommendation: friendly
-      ? "Great time to open your window!"
-      : "Keep your window closed for now.",
+    recommendation,
     reasons,
     timestamp: new Date().toISOString(),
   });
@@ -141,13 +256,15 @@ router.get("/weather/current", async (req, res) => {
 
 router.get("/weather/forecast", async (req, res) => {
   const parsed = GetWeatherForecastQueryParams.safeParse(req.query);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "lat and lon are required" });
-  }
+  if (!parsed.success) return res.status(400).json({ error: "lat and lon are required" });
+
   const { lat, lon } = parsed.data;
-  const settings = await getSettings();
-  const data = await fetchOpenMeteo(lat, lon);
-  const { hourly } = data;
+  const [settings, weatherData, aqData] = await Promise.all([
+    getSettings(),
+    fetchOpenMeteo(lat, lon),
+    fetchAirQuality(lat, lon),
+  ]);
+  const { hourly } = weatherData;
 
   const hours = hourly.time.map((time, i) => {
     const hour = new Date(time).getHours();
@@ -156,25 +273,31 @@ router.get("/weather/forecast", async (req, res) => {
     const windSpeed = hourly.wind_speed_10m[i];
     const weatherCode = hourly.weather_code[i];
     const precipProbability = hourly.precipitation_probability[i] ?? 0;
-    const { friendly } = isWindowFriendly(temp, humidity, windSpeed, weatherCode, precipProbability, settings);
-    return { hour, temperature: temp, humidity, windSpeed, isWindowFriendly: friendly, weatherCode, precipitationProbability: precipProbability };
+
+    const aqHourIdx = aqData?.hourly?.time?.findIndex((t) => t === time) ?? -1;
+    const aqi = aqHourIdx >= 0 ? (aqData!.hourly.us_aqi[aqHourIdx] ?? 0) : 0;
+    const birch = aqHourIdx >= 0 ? (aqData!.hourly.birch_pollen[aqHourIdx] ?? null) : null;
+    const grass = aqHourIdx >= 0 ? (aqData!.hourly.grass_pollen[aqHourIdx] ?? null) : null;
+    const pollenLevel = classifyPollen(birch, grass);
+
+    const { friendly } = analyzeConditions(temp, humidity, windSpeed, weatherCode, precipProbability, aqi, pollenLevel, hour, settings);
+    return { hour, temperature: temp, humidity, windSpeed, isWindowFriendly: friendly, weatherCode, precipitationProbability: precipProbability, airQualityIndex: aqi, pollenLevel };
   });
 
-  return res.json({
-    date: new Date().toISOString().split("T")[0],
-    hours,
-  });
+  return res.json({ date: new Date().toISOString().split("T")[0], hours });
 });
 
 router.get("/weather/today-summary", async (req, res) => {
   const parsed = GetTodaySummaryQueryParams.safeParse(req.query);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "lat and lon are required" });
-  }
+  if (!parsed.success) return res.status(400).json({ error: "lat and lon are required" });
+
   const { lat, lon } = parsed.data;
-  const settings = await getSettings();
-  const data = await fetchOpenMeteo(lat, lon);
-  const { hourly } = data;
+  const [settings, weatherData, aqData] = await Promise.all([
+    getSettings(),
+    fetchOpenMeteo(lat, lon),
+    fetchAirQuality(lat, lon),
+  ]);
+  const { hourly } = weatherData;
 
   const hours = hourly.time.map((time, i) => {
     const hour = new Date(time).getHours();
@@ -183,7 +306,12 @@ router.get("/weather/today-summary", async (req, res) => {
     const windSpeed = hourly.wind_speed_10m[i];
     const weatherCode = hourly.weather_code[i];
     const precipProbability = hourly.precipitation_probability[i] ?? 0;
-    const { friendly } = isWindowFriendly(temp, humidity, windSpeed, weatherCode, precipProbability, settings);
+    const aqHourIdx = aqData?.hourly?.time?.findIndex((t) => t === time) ?? -1;
+    const aqi = aqHourIdx >= 0 ? (aqData!.hourly.us_aqi[aqHourIdx] ?? 0) : 0;
+    const birch = aqHourIdx >= 0 ? (aqData!.hourly.birch_pollen[aqHourIdx] ?? null) : null;
+    const grass = aqHourIdx >= 0 ? (aqData!.hourly.grass_pollen[aqHourIdx] ?? null) : null;
+    const pollenLevel = classifyPollen(birch, grass);
+    const { friendly } = analyzeConditions(temp, humidity, windSpeed, weatherCode, precipProbability, aqi, pollenLevel, hour, settings);
     return { hour, temperature: temp, isWindowFriendly: friendly };
   });
 
@@ -192,10 +320,7 @@ router.get("/weather/today-summary", async (req, res) => {
 
   let bestWindowStart: number | null = null;
   let bestWindowEnd: number | null = null;
-  let currentRun = 0;
-  let bestRun = 0;
-  let runStart = 0;
-
+  let currentRun = 0, bestRun = 0, runStart = 0;
   for (let i = 0; i < hours.length; i++) {
     if (hours[i].isWindowFriendly) {
       if (currentRun === 0) runStart = hours[i].hour;
@@ -210,12 +335,21 @@ router.get("/weather/today-summary", async (req, res) => {
     }
   }
 
-  const overallRecommendation =
-    friendlyHours.length === 0
-      ? "Weather won't be suitable for open windows today."
-      : friendlyHours.length >= 6
-        ? "Great day for fresh air — windows can be open for much of the day."
-        : `Windows can be open for about ${friendlyHours.length} hours today.`;
+  const morningFriendly = hours.filter((h) => h.hour >= 5 && h.hour < 10 && h.isWindowFriendly).length;
+  const eveningFriendly = hours.filter((h) => h.hour >= 17 && h.hour <= 21 && h.isWindowFriendly).length;
+
+  let overallRecommendation: string;
+  if (friendlyHours.length === 0) {
+    overallRecommendation = "Weather won't be suitable for open windows today — let the AC handle it.";
+  } else if (morningFriendly >= 2 && eveningFriendly >= 2) {
+    overallRecommendation = `Good day for the open-close strategy: flush the house in the morning, close up mid-day, then reopen in the evening.`;
+  } else if (morningFriendly >= 2) {
+    overallRecommendation = `Morning looks good (${morningFriendly} window-friendly hours) — open early, then close before midday heat.`;
+  } else if (eveningFriendly >= 2) {
+    overallRecommendation = `Evening is the best window today (${eveningFriendly} good hours) — conditions improve after the afternoon.`;
+  } else {
+    overallRecommendation = `Windows can be open for about ${friendlyHours.length} hour${friendlyHours.length === 1 ? "" : "s"} today.`;
+  }
 
   return res.json({
     date: new Date().toISOString().split("T")[0],
