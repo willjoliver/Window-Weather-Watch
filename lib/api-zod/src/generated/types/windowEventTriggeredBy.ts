@@ -6,9 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-/**
- * Whether event was manual or triggered by weather check
- */
 export type WindowEventTriggeredBy =
   (typeof WindowEventTriggeredBy)[keyof typeof WindowEventTriggeredBy];
 

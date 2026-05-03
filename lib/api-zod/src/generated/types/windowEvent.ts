@@ -11,7 +11,6 @@ import type { WindowEventTriggeredBy } from "./windowEventTriggeredBy";
 export interface WindowEvent {
   id: number;
   action: WindowEventAction;
-  /** Whether event was manual or triggered by weather check */
   triggeredBy: WindowEventTriggeredBy;
   temperature?: number | null;
   humidity?: number | null;

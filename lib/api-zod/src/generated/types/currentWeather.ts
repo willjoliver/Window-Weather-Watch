@@ -7,20 +7,13 @@
  */
 
 export interface CurrentWeather {
-  /** Temperature in Celsius */
   temperature: number;
-  /** Relative humidity in percent */
   humidity: number;
-  /** Wind speed in km/h */
   windSpeed: number;
-  /** WMO weather code */
   weatherCode: number;
   weatherDescription: string;
-  /** Whether conditions are suitable for an open window */
   isWindowFriendly: boolean;
-  /** Human-readable recommendation */
   recommendation: string;
-  /** Reasons why window is or isn't recommended */
   reasons: string[];
   timestamp: Date;
 }

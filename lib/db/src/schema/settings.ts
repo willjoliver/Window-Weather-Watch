@@ -1,4 +1,4 @@
-import { pgTable, serial, real, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, real, integer, boolean, jsonb, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -13,6 +13,9 @@ export const settingsTable = pgTable("settings", {
   workEndHour: integer("work_end_hour").notNull().default(18),
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   checkIntervalMinutes: integer("check_interval_minutes").notNull().default(30),
+  locationLat: real("location_lat"),
+  locationLon: real("location_lon"),
+  locationName: text("location_name"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settingsTable).omit({ id: true });

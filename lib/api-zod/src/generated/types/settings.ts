@@ -8,21 +8,16 @@
 
 export interface Settings {
   id: number;
-  /** Minimum comfortable temperature (Celsius) */
   minTemp: number;
-  /** Maximum comfortable temperature (Celsius) */
   maxTemp: number;
-  /** Maximum acceptable humidity (%) */
   maxHumidity: number;
-  /** Maximum acceptable wind speed (km/h) */
   maxWindSpeed: number;
-  /** Work days as integers: 0=Sun, 1=Mon, ..., 6=Sat */
   workDays: number[];
-  /** Work start hour (0-23) */
   workStartHour: number;
-  /** Work end hour (0-23) */
   workEndHour: number;
   notificationsEnabled: boolean;
-  /** How often to check weather in minutes */
   checkIntervalMinutes: number;
+  locationLat: number | null;
+  locationLon: number | null;
+  locationName: string | null;
 }

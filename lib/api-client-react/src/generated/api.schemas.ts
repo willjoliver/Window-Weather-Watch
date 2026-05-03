@@ -10,20 +10,13 @@ export interface HealthStatus {
 }
 
 export interface CurrentWeather {
-  /** Temperature in Celsius */
   temperature: number;
-  /** Relative humidity in percent */
   humidity: number;
-  /** Wind speed in km/h */
   windSpeed: number;
-  /** WMO weather code */
   weatherCode: number;
   weatherDescription: string;
-  /** Whether conditions are suitable for an open window */
   isWindowFriendly: boolean;
-  /** Human-readable recommendation */
   recommendation: string;
-  /** Reasons why window is or isn't recommended */
   reasons: string[];
   timestamp: string;
 }
@@ -45,7 +38,6 @@ export interface WeatherForecast {
 export interface TodaySummary {
   date: string;
   friendlyHoursCount: number;
-  /** Hour of day (0-23) when best window-open period begins */
   bestWindowStart: number | null;
   bestWindowEnd: number | null;
   minTemp: number;
@@ -55,23 +47,18 @@ export interface TodaySummary {
 
 export interface Settings {
   id: number;
-  /** Minimum comfortable temperature (Celsius) */
   minTemp: number;
-  /** Maximum comfortable temperature (Celsius) */
   maxTemp: number;
-  /** Maximum acceptable humidity (%) */
   maxHumidity: number;
-  /** Maximum acceptable wind speed (km/h) */
   maxWindSpeed: number;
-  /** Work days as integers: 0=Sun, 1=Mon, ..., 6=Sat */
   workDays: number[];
-  /** Work start hour (0-23) */
   workStartHour: number;
-  /** Work end hour (0-23) */
   workEndHour: number;
   notificationsEnabled: boolean;
-  /** How often to check weather in minutes */
   checkIntervalMinutes: number;
+  locationLat: number | null;
+  locationLon: number | null;
+  locationName: string | null;
 }
 
 export interface SettingsUpdate {
@@ -84,6 +71,9 @@ export interface SettingsUpdate {
   workEndHour?: number;
   notificationsEnabled?: boolean;
   checkIntervalMinutes?: number;
+  locationLat?: number | null;
+  locationLon?: number | null;
+  locationName?: string | null;
 }
 
 export type WindowEventAction =
@@ -94,9 +84,6 @@ export const WindowEventAction = {
   closed: "closed",
 } as const;
 
-/**
- * Whether event was manual or triggered by weather check
- */
 export type WindowEventTriggeredBy =
   (typeof WindowEventTriggeredBy)[keyof typeof WindowEventTriggeredBy];
 
@@ -108,7 +95,6 @@ export const WindowEventTriggeredBy = {
 export interface WindowEvent {
   id: number;
   action: WindowEventAction;
-  /** Whether event was manual or triggered by weather check */
   triggeredBy: WindowEventTriggeredBy;
   temperature?: number | null;
   humidity?: number | null;

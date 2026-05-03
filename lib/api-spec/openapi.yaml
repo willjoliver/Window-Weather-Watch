@@ -198,29 +198,22 @@ components:
       properties:
         temperature:
           type: number
-          description: Temperature in Celsius
         humidity:
           type: number
-          description: Relative humidity in percent
         windSpeed:
           type: number
-          description: Wind speed in km/h
         weatherCode:
           type: integer
-          description: WMO weather code
         weatherDescription:
           type: string
         isWindowFriendly:
           type: boolean
-          description: Whether conditions are suitable for an open window
         recommendation:
           type: string
-          description: Human-readable recommendation
         reasons:
           type: array
           items:
             type: string
-          description: Reasons why window is or isn't recommended
         timestamp:
           type: string
           format: date-time
@@ -279,7 +272,6 @@ components:
         bestWindowStart:
           type: integer
           nullable: true
-          description: Hour of day (0-23) when best window-open period begins
         bestWindowEnd:
           type: integer
           nullable: true
@@ -305,32 +297,33 @@ components:
           type: integer
         minTemp:
           type: number
-          description: Minimum comfortable temperature (Celsius)
         maxTemp:
           type: number
-          description: Maximum comfortable temperature (Celsius)
         maxHumidity:
           type: number
-          description: Maximum acceptable humidity (%)
         maxWindSpeed:
           type: number
-          description: Maximum acceptable wind speed (km/h)
         workDays:
           type: array
           items:
             type: integer
-          description: "Work days as integers: 0=Sun, 1=Mon, ..., 6=Sat"
         workStartHour:
           type: integer
-          description: Work start hour (0-23)
         workEndHour:
           type: integer
-          description: Work end hour (0-23)
         notificationsEnabled:
           type: boolean
         checkIntervalMinutes:
           type: integer
-          description: How often to check weather in minutes
+        locationLat:
+          type: number
+          nullable: true
+        locationLon:
+          type: number
+          nullable: true
+        locationName:
+          type: string
+          nullable: true
       required:
         - id
         - minTemp
@@ -342,6 +335,9 @@ components:
         - workEndHour
         - notificationsEnabled
         - checkIntervalMinutes
+        - locationLat
+        - locationLon
+        - locationName
 
     SettingsUpdate:
       type: object
@@ -366,6 +362,15 @@ components:
           type: boolean
         checkIntervalMinutes:
           type: integer
+        locationLat:
+          type: number
+          nullable: true
+        locationLon:
+          type: number
+          nullable: true
+        locationName:
+          type: string
+          nullable: true
 
     WindowEvent:
       type: object
@@ -378,7 +383,6 @@ components:
         triggeredBy:
           type: string
           enum: [user, auto]
-          description: Whether event was manual or triggered by weather check
         temperature:
           type: number
           nullable: true

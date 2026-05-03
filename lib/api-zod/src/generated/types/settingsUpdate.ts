@@ -16,4 +16,7 @@ export interface SettingsUpdate {
   workEndHour?: number;
   notificationsEnabled?: boolean;
   checkIntervalMinutes?: number;
+  locationLat?: number | null;
+  locationLon?: number | null;
+  locationName?: string | null;
 }

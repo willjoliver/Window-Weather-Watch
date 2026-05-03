@@ -23,18 +23,14 @@ export const GetCurrentWeatherQueryParams = zod.object({
 });
 
 export const GetCurrentWeatherResponse = zod.object({
-  temperature: zod.number().describe("Temperature in Celsius"),
-  humidity: zod.number().describe("Relative humidity in percent"),
-  windSpeed: zod.number().describe("Wind speed in km\/h"),
-  weatherCode: zod.number().describe("WMO weather code"),
+  temperature: zod.number(),
+  humidity: zod.number(),
+  windSpeed: zod.number(),
+  weatherCode: zod.number(),
   weatherDescription: zod.string(),
-  isWindowFriendly: zod
-    .boolean()
-    .describe("Whether conditions are suitable for an open window"),
-  recommendation: zod.string().describe("Human-readable recommendation"),
-  reasons: zod
-    .array(zod.string())
-    .describe("Reasons why window is or isn't recommended"),
+  isWindowFriendly: zod.boolean(),
+  recommendation: zod.string(),
+  reasons: zod.array(zod.string()),
   timestamp: zod.coerce.date(),
 });
 
@@ -71,10 +67,7 @@ export const GetTodaySummaryQueryParams = zod.object({
 export const GetTodaySummaryResponse = zod.object({
   date: zod.string(),
   friendlyHoursCount: zod.number(),
-  bestWindowStart: zod
-    .number()
-    .nullable()
-    .describe("Hour of day (0-23) when best window-open period begins"),
+  bestWindowStart: zod.number().nullable(),
   bestWindowEnd: zod.number().nullable(),
   minTemp: zod.number(),
   maxTemp: zod.number(),
@@ -86,19 +79,18 @@ export const GetTodaySummaryResponse = zod.object({
  */
 export const GetSettingsResponse = zod.object({
   id: zod.number(),
-  minTemp: zod.number().describe("Minimum comfortable temperature (Celsius)"),
-  maxTemp: zod.number().describe("Maximum comfortable temperature (Celsius)"),
-  maxHumidity: zod.number().describe("Maximum acceptable humidity (%)"),
-  maxWindSpeed: zod.number().describe("Maximum acceptable wind speed (km\/h)"),
-  workDays: zod
-    .array(zod.number())
-    .describe("Work days as integers: 0=Sun, 1=Mon, ..., 6=Sat"),
-  workStartHour: zod.number().describe("Work start hour (0-23)"),
-  workEndHour: zod.number().describe("Work end hour (0-23)"),
+  minTemp: zod.number(),
+  maxTemp: zod.number(),
+  maxHumidity: zod.number(),
+  maxWindSpeed: zod.number(),
+  workDays: zod.array(zod.number()),
+  workStartHour: zod.number(),
+  workEndHour: zod.number(),
   notificationsEnabled: zod.boolean(),
-  checkIntervalMinutes: zod
-    .number()
-    .describe("How often to check weather in minutes"),
+  checkIntervalMinutes: zod.number(),
+  locationLat: zod.number().nullable(),
+  locationLon: zod.number().nullable(),
+  locationName: zod.string().nullable(),
 });
 
 /**
@@ -114,23 +106,25 @@ export const UpdateSettingsBody = zod.object({
   workEndHour: zod.number().optional(),
   notificationsEnabled: zod.boolean().optional(),
   checkIntervalMinutes: zod.number().optional(),
+  locationLat: zod.number().nullish(),
+  locationLon: zod.number().nullish(),
+  locationName: zod.string().nullish(),
 });
 
 export const UpdateSettingsResponse = zod.object({
   id: zod.number(),
-  minTemp: zod.number().describe("Minimum comfortable temperature (Celsius)"),
-  maxTemp: zod.number().describe("Maximum comfortable temperature (Celsius)"),
-  maxHumidity: zod.number().describe("Maximum acceptable humidity (%)"),
-  maxWindSpeed: zod.number().describe("Maximum acceptable wind speed (km\/h)"),
-  workDays: zod
-    .array(zod.number())
-    .describe("Work days as integers: 0=Sun, 1=Mon, ..., 6=Sat"),
-  workStartHour: zod.number().describe("Work start hour (0-23)"),
-  workEndHour: zod.number().describe("Work end hour (0-23)"),
+  minTemp: zod.number(),
+  maxTemp: zod.number(),
+  maxHumidity: zod.number(),
+  maxWindSpeed: zod.number(),
+  workDays: zod.array(zod.number()),
+  workStartHour: zod.number(),
+  workEndHour: zod.number(),
   notificationsEnabled: zod.boolean(),
-  checkIntervalMinutes: zod
-    .number()
-    .describe("How often to check weather in minutes"),
+  checkIntervalMinutes: zod.number(),
+  locationLat: zod.number().nullable(),
+  locationLon: zod.number().nullable(),
+  locationName: zod.string().nullable(),
 });
 
 /**
@@ -145,9 +139,7 @@ export const GetEventsQueryParams = zod.object({
 export const GetEventsResponseItem = zod.object({
   id: zod.number(),
   action: zod.enum(["opened", "closed"]),
-  triggeredBy: zod
-    .enum(["user", "auto"])
-    .describe("Whether event was manual or triggered by weather check"),
+  triggeredBy: zod.enum(["user", "auto"]),
   temperature: zod.number().nullish(),
   humidity: zod.number().nullish(),
   windSpeed: zod.number().nullish(),

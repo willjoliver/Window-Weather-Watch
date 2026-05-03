@@ -1,18 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Save, Bell, Thermometer, Droplets, Wind, Clock, Calendar } from "lucide-react";
+import { Save, Bell, Thermometer, Droplets, Wind, Clock, Calendar, MapPin, Search, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { useGetSettings, useUpdateSettings, getGetSettingsQueryKey } from "@workspace/api-client-react";
+import { useGetSettings, useUpdateSettings, getGetSettingsQueryKey, getGetCurrentWeatherQueryKey, getGetWeatherForecastQueryKey, getGetTodaySummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -27,15 +27,35 @@ const schema = z.object({
   workEndHour: z.number().min(1).max(24),
   notificationsEnabled: z.boolean(),
   checkIntervalMinutes: z.number().min(5).max(120),
+  locationName: z.string().nullable(),
+  locationLat: z.number().nullable(),
+  locationLon: z.number().nullable(),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+async function geocodeAddress(address: string): Promise<{ lat: number; lon: number; displayName: string } | null> {
+  const encoded = encodeURIComponent(address);
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&limit=1`,
+    { headers: { "User-Agent": "WindowWeatherApp/1.0" } }
+  );
+  const data = await res.json();
+  if (!data || data.length === 0) return null;
+  return {
+    lat: parseFloat(data[0].lat),
+    lon: parseFloat(data[0].lon),
+    displayName: data[0].display_name,
+  };
+}
 
 export default function Settings() {
   const { data: settings, isLoading } = useGetSettings();
   const updateSettings = useUpdateSettings();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [addressInput, setAddressInput] = useState("");
+  const [geocoding, setGeocoding] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -49,6 +69,9 @@ export default function Settings() {
       workEndHour: 18,
       notificationsEnabled: true,
       checkIntervalMinutes: 30,
+      locationName: null,
+      locationLat: null,
+      locationLon: null,
     },
   });
 
@@ -64,16 +87,45 @@ export default function Settings() {
         workEndHour: settings.workEndHour,
         notificationsEnabled: settings.notificationsEnabled,
         checkIntervalMinutes: settings.checkIntervalMinutes,
+        locationName: settings.locationName ?? null,
+        locationLat: settings.locationLat ?? null,
+        locationLon: settings.locationLon ?? null,
       });
+      if (settings.locationName) setAddressInput(settings.locationName);
     }
   }, [settings]);
+
+  async function handleGeocode() {
+    if (!addressInput.trim()) return;
+    setGeocoding(true);
+    try {
+      const result = await geocodeAddress(addressInput);
+      if (!result) {
+        toast({ title: "Address not found", description: "Try a more specific address.", variant: "destructive" });
+        return;
+      }
+      form.setValue("locationLat", result.lat);
+      form.setValue("locationLon", result.lon);
+      form.setValue("locationName", addressInput.trim());
+      toast({ title: "Location found", description: `${result.lat.toFixed(4)}°N, ${Math.abs(result.lon).toFixed(4)}°W` });
+    } catch {
+      toast({ title: "Geocoding failed", description: "Check your connection and try again.", variant: "destructive" });
+    } finally {
+      setGeocoding(false);
+    }
+  }
 
   function onSubmit(values: FormValues) {
     updateSettings.mutate(
       { data: values },
       {
-        onSuccess: () => {
+        onSuccess: (updated) => {
           queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+          if (updated.locationLat && updated.locationLon) {
+            queryClient.invalidateQueries({ queryKey: getGetCurrentWeatherQueryKey({ lat: updated.locationLat, lon: updated.locationLon }) });
+            queryClient.invalidateQueries({ queryKey: getGetWeatherForecastQueryKey({ lat: updated.locationLat, lon: updated.locationLon }) });
+            queryClient.invalidateQueries({ queryKey: getGetTodaySummaryQueryKey({ lat: updated.locationLat, lon: updated.locationLon }) });
+          }
           toast({ title: "Settings saved" });
         },
         onError: () => {
@@ -83,23 +135,62 @@ export default function Settings() {
     );
   }
 
+  const currentLat = form.watch("locationLat");
+  const currentLon = form.watch("locationLon");
+
   return (
     <div className="p-8 max-w-2xl">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <div className="mb-8">
           <h1 className="text-2xl font-semibold">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Configure your comfort thresholds and work schedule</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Configure your location, comfort thresholds, and work schedule</p>
         </div>
 
         {isLoading ? (
           <div className="space-y-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-32 w-full rounded-xl" />
             ))}
           </div>
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+
+              {/* Location */}
+              <Card className="p-5">
+                <div className="flex items-center gap-2 mb-5">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  <h2 className="font-semibold text-sm">Location</h2>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      value={addressInput}
+                      onChange={(e) => setAddressInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleGeocode())}
+                      placeholder="Enter your address…"
+                      data-testid="input-address"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleGeocode}
+                      disabled={geocoding || !addressInput.trim()}
+                      data-testid="button-geocode"
+                    >
+                      {geocoding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  {currentLat !== null && currentLon !== null ? (
+                    <p className="text-xs text-muted-foreground" data-testid="text-coordinates">
+                      Coordinates: {currentLat?.toFixed(4)}°N, {Math.abs(currentLon ?? 0).toFixed(4)}°W
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">No location set — enter an address and click the search button.</p>
+                  )}
+                </div>
+              </Card>
 
               {/* Temperature */}
               <Card className="p-5">
@@ -118,16 +209,9 @@ export default function Settings() {
                           <span className="text-sm font-semibold text-primary" data-testid="value-min-temp">{field.value}°C</span>
                         </div>
                         <FormControl>
-                          <Slider
-                            min={-10}
-                            max={30}
-                            step={1}
-                            value={[field.value]}
-                            onValueChange={([v]) => field.onChange(v)}
-                            data-testid="slider-min-temp"
-                          />
+                          <Slider min={-10} max={30} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-min-temp" />
                         </FormControl>
-                        <FormDescription className="text-xs">Alert to close window below this temperature</FormDescription>
+                        <FormDescription className="text-xs">Close window alert below this temperature</FormDescription>
                       </FormItem>
                     )}
                   />
@@ -141,16 +225,9 @@ export default function Settings() {
                           <span className="text-sm font-semibold text-primary" data-testid="value-max-temp">{field.value}°C</span>
                         </div>
                         <FormControl>
-                          <Slider
-                            min={10}
-                            max={40}
-                            step={1}
-                            value={[field.value]}
-                            onValueChange={([v]) => field.onChange(v)}
-                            data-testid="slider-max-temp"
-                          />
+                          <Slider min={10} max={40} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-max-temp" />
                         </FormControl>
-                        <FormDescription className="text-xs">Alert to close window above this temperature</FormDescription>
+                        <FormDescription className="text-xs">Close window alert above this temperature</FormDescription>
                       </FormItem>
                     )}
                   />
@@ -174,14 +251,7 @@ export default function Settings() {
                           <span className="text-sm font-semibold text-primary" data-testid="value-max-humidity">{field.value}%</span>
                         </div>
                         <FormControl>
-                          <Slider
-                            min={30}
-                            max={100}
-                            step={5}
-                            value={[field.value]}
-                            onValueChange={([v]) => field.onChange(v)}
-                            data-testid="slider-max-humidity"
-                          />
+                          <Slider min={30} max={100} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-max-humidity" />
                         </FormControl>
                       </FormItem>
                     )}
@@ -199,14 +269,7 @@ export default function Settings() {
                           <span className="text-sm font-semibold text-primary" data-testid="value-max-wind">{field.value} km/h</span>
                         </div>
                         <FormControl>
-                          <Slider
-                            min={0}
-                            max={80}
-                            step={5}
-                            value={[field.value]}
-                            onValueChange={([v]) => field.onChange(v)}
-                            data-testid="slider-max-wind"
-                          />
+                          <Slider min={0} max={80} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-max-wind" />
                         </FormControl>
                       </FormItem>
                     )}
@@ -269,14 +332,7 @@ export default function Settings() {
                           <span className="text-sm font-semibold text-primary" data-testid="value-start-hour">{field.value}:00</span>
                         </div>
                         <FormControl>
-                          <Slider
-                            min={0}
-                            max={12}
-                            step={1}
-                            value={[field.value]}
-                            onValueChange={([v]) => field.onChange(v)}
-                            data-testid="slider-start-hour"
-                          />
+                          <Slider min={0} max={12} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-start-hour" />
                         </FormControl>
                       </FormItem>
                     )}
@@ -291,14 +347,7 @@ export default function Settings() {
                           <span className="text-sm font-semibold text-primary" data-testid="value-end-hour">{field.value}:00</span>
                         </div>
                         <FormControl>
-                          <Slider
-                            min={12}
-                            max={24}
-                            step={1}
-                            value={[field.value]}
-                            onValueChange={([v]) => field.onChange(v)}
-                            data-testid="slider-end-hour"
-                          />
+                          <Slider min={12} max={24} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-end-hour" />
                         </FormControl>
                       </FormItem>
                     )}
@@ -322,11 +371,7 @@ export default function Settings() {
                         <FormDescription className="text-xs">Get browser alerts when window conditions change</FormDescription>
                       </div>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="switch-notifications"
-                        />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-notifications" />
                       </FormControl>
                     </FormItem>
                   )}
@@ -341,28 +386,16 @@ export default function Settings() {
                         <span className="text-sm font-semibold text-primary" data-testid="value-interval">every {field.value} min</span>
                       </div>
                       <FormControl>
-                        <Slider
-                          min={5}
-                          max={60}
-                          step={5}
-                          value={[field.value]}
-                          onValueChange={([v]) => field.onChange(v)}
-                          data-testid="slider-interval"
-                        />
+                        <Slider min={5} max={60} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-interval" />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </Card>
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={updateSettings.isPending}
-                data-testid="button-save-settings"
-              >
+              <Button type="submit" className="w-full" disabled={updateSettings.isPending} data-testid="button-save-settings">
                 <Save className="w-4 h-4 mr-2" />
-                {updateSettings.isPending ? "Saving..." : "Save settings"}
+                {updateSettings.isPending ? "Saving…" : "Save settings"}
               </Button>
             </form>
           </Form>

@@ -9,7 +9,6 @@
 export interface TodaySummary {
   date: string;
   friendlyHoursCount: number;
-  /** Hour of day (0-23) when best window-open period begins */
   bestWindowStart: number | null;
   bestWindowEnd: number | null;
   minTemp: number;

@@ -17,11 +17,11 @@ import {
   useGetWeatherForecast,
   getGetWeatherForecastQueryKey,
   useGetSettings,
+  getGetSettingsQueryKey,
   useCreateEvent,
   getGetEventsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "@/hooks/use-location";
 import { cn } from "@/lib/utils";
 
 function WeatherMetric({
@@ -56,7 +56,6 @@ function WeatherMetric({
 }
 
 export default function Dashboard() {
-  const { location, requestLocation } = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [monitoring, setMonitoring] = useState(false);
@@ -64,23 +63,27 @@ export default function Dashboard() {
   const prevFriendly = useRef<boolean | null>(null);
   const createEvent = useCreateEvent();
 
-  const enabled = location.status === "granted";
-  const lat = location.status === "granted" ? location.lat : 0;
-  const lon = location.status === "granted" ? location.lon : 0;
+  const { data: settings, isLoading: settingsLoading } = useGetSettings({
+    query: { queryKey: getGetSettingsQueryKey() },
+  });
+
+  const lat = settings?.locationLat ?? null;
+  const lon = settings?.locationLon ?? null;
+  const locationName = settings?.locationName ?? null;
+  const enabled = lat !== null && lon !== null;
 
   const { data: weather, isLoading: weatherLoading, refetch: refetchWeather } = useGetCurrentWeather(
-    { lat, lon },
-    { query: { enabled, queryKey: getGetCurrentWeatherQueryKey({ lat, lon }) } }
+    { lat: lat ?? 0, lon: lon ?? 0 },
+    { query: { enabled, queryKey: getGetCurrentWeatherQueryKey({ lat: lat ?? 0, lon: lon ?? 0 }) } }
   );
   const { data: summary, isLoading: summaryLoading } = useGetTodaySummary(
-    { lat, lon },
-    { query: { enabled, queryKey: getGetTodaySummaryQueryKey({ lat, lon }) } }
+    { lat: lat ?? 0, lon: lon ?? 0 },
+    { query: { enabled, queryKey: getGetTodaySummaryQueryKey({ lat: lat ?? 0, lon: lon ?? 0 }) } }
   );
   const { data: forecast, isLoading: forecastLoading } = useGetWeatherForecast(
-    { lat, lon },
-    { query: { enabled, queryKey: getGetWeatherForecastQueryKey({ lat, lon }) } }
+    { lat: lat ?? 0, lon: lon ?? 0 },
+    { query: { enabled, queryKey: getGetWeatherForecastQueryKey({ lat: lat ?? 0, lon: lon ?? 0 }) } }
   );
-  const { data: settings } = useGetSettings();
 
   const interval = settings?.checkIntervalMinutes ?? 30;
 
@@ -154,10 +157,25 @@ export default function Dashboard() {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Good{nowHour < 12 ? " morning" : nowHour < 18 ? " afternoon" : " evening"}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-            </p>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Good{nowHour < 12 ? " morning" : nowHour < 18 ? " afternoon" : " evening"}
+            </h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {settingsLoading ? (
+                <Skeleton className="h-4 w-48" />
+              ) : locationName ? (
+                <>
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <p className="text-sm text-muted-foreground truncate max-w-xs" data-testid="text-location-name">
+                    {locationName}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -176,17 +194,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Location denied */}
-        {location.status === "denied" && (
-          <Card className="p-6 mb-6 border-destructive/30 bg-destructive/5">
+        {/* No location configured */}
+        {!settingsLoading && !enabled && (
+          <Card className="p-6 mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
             <div className="flex items-center gap-3">
-              <MapPin className="w-5 h-5 text-destructive" />
+              <MapPin className="w-5 h-5 text-amber-600" />
               <div>
-                <p className="font-medium text-foreground">Location access needed</p>
-                <p className="text-sm text-muted-foreground">{location.error}</p>
+                <p className="font-medium text-foreground">No location set</p>
+                <p className="text-sm text-muted-foreground">Add your address in Settings to start monitoring weather.</p>
               </div>
-              <Button size="sm" variant="outline" onClick={requestLocation} className="ml-auto">
-                Retry
+              <Button size="sm" variant="outline" onClick={() => window.location.href = "/settings"} className="ml-auto">
+                Go to Settings
               </Button>
             </div>
           </Card>
@@ -203,7 +221,7 @@ export default function Dashboard() {
           <div className="relative">
             <div className="flex items-start justify-between mb-5">
               <div>
-                {weatherLoading ? (
+                {weatherLoading || settingsLoading ? (
                   <>
                     <Skeleton className="h-8 w-48 mb-2" />
                     <Skeleton className="h-4 w-64" />
@@ -217,25 +235,31 @@ export default function Dashboard() {
                       exit={{ opacity: 0, y: -6 }}
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        {friendly ? (
-                          <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        ) : (
-                          <XCircle className="w-5 h-5 text-muted-foreground" />
-                        )}
-                        <h2 className="text-lg font-semibold">{weather?.recommendation}</h2>
+                        {weather ? (
+                          friendly ? (
+                            <CheckCircle className="w-5 h-5 text-emerald-600" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-muted-foreground" />
+                          )
+                        ) : null}
+                        <h2 className="text-lg font-semibold">
+                          {weather?.recommendation ?? (enabled ? "Checking weather…" : "Set a location to begin")}
+                        </h2>
                       </div>
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {weather?.reasons?.map((r, i) => (
-                          <Badge
-                            key={i}
-                            variant={friendly ? "default" : "secondary"}
-                            className="text-xs font-normal"
-                            data-testid={`badge-reason-${i}`}
-                          >
-                            {r}
-                          </Badge>
-                        ))}
-                      </div>
+                      {weather && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {weather.reasons?.map((r, i) => (
+                            <Badge
+                              key={i}
+                              variant={friendly ? "default" : "secondary"}
+                              className="text-xs font-normal"
+                              data-testid={`badge-reason-${i}`}
+                            >
+                              {r}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </motion.div>
                   </AnimatePresence>
                 )}
@@ -246,7 +270,7 @@ export default function Dashboard() {
                   variant={windowState === "open" ? "default" : "outline"}
                   onClick={() => logWindowAction("opened")}
                   data-testid="button-log-open"
-                  disabled={createEvent.isPending}
+                  disabled={createEvent.isPending || !enabled}
                 >
                   Open
                 </Button>
@@ -255,7 +279,7 @@ export default function Dashboard() {
                   variant={windowState === "closed" ? "default" : "outline"}
                   onClick={() => logWindowAction("closed")}
                   data-testid="button-log-close"
-                  disabled={createEvent.isPending}
+                  disabled={createEvent.isPending || !enabled}
                 >
                   Close
                 </Button>
@@ -264,27 +288,9 @@ export default function Dashboard() {
 
             {/* Metrics row */}
             <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border">
-              <WeatherMetric
-                icon={Thermometer}
-                label="Temperature"
-                value={weather?.temperature}
-                unit="°C"
-                loading={weatherLoading}
-              />
-              <WeatherMetric
-                icon={Droplets}
-                label="Humidity"
-                value={weather?.humidity}
-                unit="%"
-                loading={weatherLoading}
-              />
-              <WeatherMetric
-                icon={Wind}
-                label="Wind speed"
-                value={weather?.windSpeed}
-                unit="km/h"
-                loading={weatherLoading}
-              />
+              <WeatherMetric icon={Thermometer} label="Temperature" value={weather?.temperature} unit="°C" loading={weatherLoading} />
+              <WeatherMetric icon={Droplets} label="Humidity" value={weather?.humidity} unit="%" loading={weatherLoading} />
+              <WeatherMetric icon={Wind} label="Wind speed" value={weather?.windSpeed} unit="km/h" loading={weatherLoading} />
             </div>
           </div>
         </Card>
@@ -299,7 +305,7 @@ export default function Dashboard() {
             <Card className="p-5 mb-5">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Today's outlook</h3>
               <p className="text-sm text-foreground mb-3">{summary.overallRecommendation}</p>
-              <div className="flex gap-6 text-sm">
+              <div className="flex flex-wrap gap-6 text-sm">
                 <div>
                   <span className="text-muted-foreground">Window-friendly hours: </span>
                   <span className="font-medium">{summary.friendlyHoursCount}</span>
@@ -314,7 +320,9 @@ export default function Dashboard() {
                 )}
                 <div>
                   <span className="text-muted-foreground">Range: </span>
-                  <span className="font-medium">{summary.minTemp?.toFixed(1)}°C – {summary.maxTemp?.toFixed(1)}°C</span>
+                  <span className="font-medium">
+                    {summary.minTemp?.toFixed(1)}°C – {summary.maxTemp?.toFixed(1)}°C
+                  </span>
                 </div>
               </div>
             </Card>
@@ -324,12 +332,14 @@ export default function Dashboard() {
         {/* Hourly forecast */}
         <Card className="p-5 mb-5">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Hourly forecast</h3>
-          {forecastLoading ? (
+          {forecastLoading || (enabled && hourlyItems.length === 0) ? (
             <div className="flex gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
                 <Skeleton key={i} className="h-16 w-14 rounded-lg" />
               ))}
             </div>
+          ) : !enabled ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">Set a location to see the forecast.</p>
           ) : (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {hourlyItems.map((h, i) => {
@@ -372,9 +382,12 @@ export default function Dashboard() {
             <span>
               Monitoring during work hours: {settings.workStartHour}:00 – {settings.workEndHour}:00 on work days
             </span>
-            <a href="/settings" className="flex items-center gap-0.5 text-primary hover:underline ml-1">
+            <button
+              onClick={() => window.location.href = "/settings"}
+              className="flex items-center gap-0.5 text-primary hover:underline ml-1"
+            >
               Change <ChevronRight className="w-3 h-3" />
-            </a>
+            </button>
           </div>
         )}
       </motion.div>
