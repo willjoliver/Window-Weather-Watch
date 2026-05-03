@@ -82,6 +82,37 @@ export const GetTodaySummaryResponse = zod.object({
 });
 
 /**
+ * @summary Get 7-day window forecast
+ */
+export const GetWeeklyForecastQueryParams = zod.object({
+  lat: zod.coerce.number(),
+  lon: zod.coerce.number(),
+});
+
+export const GetWeeklyForecastResponse = zod.object({
+  days: zod.array(
+    zod.object({
+      date: zod.string(),
+      dayName: zod.string(),
+      highTemp: zod.number(),
+      lowTemp: zod.number(),
+      maxPrecipProbability: zod.number(),
+      weatherCode: zod.number(),
+      weatherDescription: zod.string(),
+      airQualityIndex: zod.number(),
+      pollenLevel: zod.enum(["low", "moderate", "high", "very-high"]),
+      friendlyHoursCount: zod.number(),
+      morningWindowHours: zod.number(),
+      eveningWindowHours: zod.number(),
+      bestWindowStart: zod.number().nullable(),
+      bestWindowEnd: zod.number().nullable(),
+      strategy: zod.enum(["both", "morning", "evening", "throughout", "none"]),
+      overallRecommendation: zod.string(),
+    }),
+  ),
+});
+
+/**
  * @summary Get user settings
  */
 export const GetSettingsResponse = zod.object({

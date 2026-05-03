@@ -57,6 +57,50 @@ export interface HourlyWeather {
   pollenLevel: HourlyWeatherPollenLevel;
 }
 
+export type DayForecastPollenLevel =
+  (typeof DayForecastPollenLevel)[keyof typeof DayForecastPollenLevel];
+
+export const DayForecastPollenLevel = {
+  low: "low",
+  moderate: "moderate",
+  high: "high",
+  "very-high": "very-high",
+} as const;
+
+export type DayForecastStrategy =
+  (typeof DayForecastStrategy)[keyof typeof DayForecastStrategy];
+
+export const DayForecastStrategy = {
+  both: "both",
+  morning: "morning",
+  evening: "evening",
+  throughout: "throughout",
+  none: "none",
+} as const;
+
+export interface DayForecast {
+  date: string;
+  dayName: string;
+  highTemp: number;
+  lowTemp: number;
+  maxPrecipProbability: number;
+  weatherCode: number;
+  weatherDescription: string;
+  airQualityIndex: number;
+  pollenLevel: DayForecastPollenLevel;
+  friendlyHoursCount: number;
+  morningWindowHours: number;
+  eveningWindowHours: number;
+  bestWindowStart: number | null;
+  bestWindowEnd: number | null;
+  strategy: DayForecastStrategy;
+  overallRecommendation: string;
+}
+
+export interface WeeklyForecast {
+  days: DayForecast[];
+}
+
 export interface WeatherForecast {
   date: string;
   hours: HourlyWeather[];
@@ -180,6 +224,11 @@ export type GetWeatherForecastParams = {
 };
 
 export type GetTodaySummaryParams = {
+  lat: number;
+  lon: number;
+};
+
+export type GetWeeklyForecastParams = {
   lat: number;
   lon: number;
 };

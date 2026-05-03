@@ -24,11 +24,13 @@ import type {
   GetEventsParams,
   GetTodaySummaryParams,
   GetWeatherForecastParams,
+  GetWeeklyForecastParams,
   HealthStatus,
   Settings,
   SettingsUpdate,
   TodaySummary,
   WeatherForecast,
+  WeeklyForecast,
   WindowEvent,
 } from "./api.schemas";
 
@@ -396,6 +398,103 @@ export function useGetTodaySummary<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetTodaySummaryQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get 7-day window forecast
+ */
+export const getGetWeeklyForecastUrl = (params: GetWeeklyForecastParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/weather/weekly?${stringifiedParams}`
+    : `/api/weather/weekly`;
+};
+
+export const getWeeklyForecast = async (
+  params: GetWeeklyForecastParams,
+  options?: RequestInit,
+): Promise<WeeklyForecast> => {
+  return customFetch<WeeklyForecast>(getGetWeeklyForecastUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWeeklyForecastQueryKey = (
+  params?: GetWeeklyForecastParams,
+) => {
+  return [`/api/weather/weekly`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetWeeklyForecastQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWeeklyForecast>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetWeeklyForecastParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWeeklyForecast>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetWeeklyForecastQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getWeeklyForecast>>
+  > = ({ signal }) => getWeeklyForecast(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWeeklyForecast>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetWeeklyForecastQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWeeklyForecast>>
+>;
+export type GetWeeklyForecastQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get 7-day window forecast
+ */
+
+export function useGetWeeklyForecast<
+  TData = Awaited<ReturnType<typeof getWeeklyForecast>>,
+  TError = ErrorType<unknown>,
+>(
+  params: GetWeeklyForecastParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWeeklyForecast>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWeeklyForecastQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

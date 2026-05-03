@@ -1,9 +1,10 @@
 import { useLocation } from "wouter";
-import { LayoutDashboard, History, Settings, Wind } from "lucide-react";
+import { LayoutDashboard, History, Settings, Wind, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/forecast", label: "7-Day Forecast", icon: CalendarDays },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

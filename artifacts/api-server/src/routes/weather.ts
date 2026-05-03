@@ -154,13 +154,13 @@ function getTimeOfDayTip(hour: number): string {
 
 // ─── Data Fetching ──────────────────────────────────────────────────────────
 
-async function fetchOpenMeteo(lat: number, lon: number) {
+async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
   const url = [
     `https://api.open-meteo.com/v1/forecast`,
     `?latitude=${lat}&longitude=${lon}`,
-    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`,
+    forecastDays === 1 ? `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code` : "",
     `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability`,
-    `&timezone=auto&forecast_days=1`,
+    `&timezone=auto&forecast_days=${forecastDays}`,
     `&temperature_unit=fahrenheit&wind_speed_unit=mph`,
   ].join("");
   const res = await fetch(url);
@@ -171,14 +171,14 @@ async function fetchOpenMeteo(lat: number, lon: number) {
   }>;
 }
 
-async function fetchAirQuality(lat: number, lon: number) {
+async function fetchAirQuality(lat: number, lon: number, forecastDays = 1) {
   try {
     const url = [
       `https://air-quality-api.open-meteo.com/v1/air-quality`,
       `?latitude=${lat}&longitude=${lon}`,
-      `&current=us_aqi,birch_pollen,grass_pollen`,
+      forecastDays === 1 ? `&current=us_aqi,birch_pollen,grass_pollen` : "",
       `&hourly=us_aqi,birch_pollen,grass_pollen`,
-      `&timezone=auto&forecast_days=1`,
+      `&timezone=auto&forecast_days=${forecastDays}`,
     ].join("");
     const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
     if (!res.ok) return null;
@@ -360,6 +360,145 @@ router.get("/weather/today-summary", async (req, res) => {
     maxTemp: Math.max(...temps),
     overallRecommendation,
   });
+});
+
+router.get("/weather/weekly", async (req, res) => {
+  const parsed = GetCurrentWeatherQueryParams.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: "lat and lon are required" });
+
+  const { lat, lon } = parsed.data;
+  const [settings, weatherData, aqData] = await Promise.all([
+    getSettings(),
+    fetchOpenMeteo(lat, lon, 7),
+    fetchAirQuality(lat, lon, 7),
+  ]);
+
+  const { hourly } = weatherData;
+
+  // Group hourly data by date
+  type HourEntry = {
+    hour: number;
+    temp: number;
+    humidity: number;
+    windSpeed: number;
+    weatherCode: number;
+    precipProbability: number;
+    aqi: number;
+    birch: number | null;
+    grass: number | null;
+  };
+  const dayMap = new Map<string, HourEntry[]>();
+
+  for (let i = 0; i < hourly.time.length; i++) {
+    const time = hourly.time[i];
+    const date = time.split("T")[0];
+    const hour = new Date(time).getHours();
+    const aqIdx = aqData?.hourly?.time?.findIndex((t) => t === time) ?? -1;
+    const entry: HourEntry = {
+      hour,
+      temp: hourly.temperature_2m[i],
+      humidity: hourly.relative_humidity_2m[i],
+      windSpeed: hourly.wind_speed_10m[i],
+      weatherCode: hourly.weather_code[i],
+      precipProbability: hourly.precipitation_probability[i] ?? 0,
+      aqi: aqIdx >= 0 ? (aqData!.hourly.us_aqi[aqIdx] ?? 0) : 0,
+      birch: aqIdx >= 0 ? (aqData!.hourly.birch_pollen[aqIdx] ?? null) : null,
+      grass: aqIdx >= 0 ? (aqData!.hourly.grass_pollen[aqIdx] ?? null) : null,
+    };
+    if (!dayMap.has(date)) dayMap.set(date, []);
+    dayMap.get(date)!.push(entry);
+  }
+
+  const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const days = Array.from(dayMap.entries()).map(([date, hours]) => {
+    const temps = hours.map((h) => h.temp);
+    const highTemp = Math.max(...temps);
+    const lowTemp = Math.min(...temps);
+    const maxPrecipProbability = Math.max(...hours.map((h) => h.precipProbability));
+    const maxAqiDay = Math.max(...hours.map((h) => h.aqi));
+    const midday = hours.find((h) => h.hour === 12) ?? hours[Math.floor(hours.length / 2)];
+    const weatherCode = midday.weatherCode;
+    const totalBirch = hours.reduce((s, h) => s + (h.birch ?? 0), 0) / hours.length;
+    const totalGrass = hours.reduce((s, h) => s + (h.grass ?? 0), 0) / hours.length;
+    const pollenLevel = classifyPollen(totalBirch, totalGrass);
+
+    // Determine friendly hours
+    const friendlyHours = hours.filter((h) => {
+      const pl = classifyPollen(h.birch, h.grass);
+      return analyzeConditions(h.temp, h.humidity, h.windSpeed, h.weatherCode, h.precipProbability, h.aqi, pl, h.hour, settings).friendly;
+    });
+
+    const morningWindowHours = Math.min(5, friendlyHours.filter((h) => h.hour >= 5 && h.hour < 10).length);
+    const eveningWindowHours = Math.min(5, friendlyHours.filter((h) => h.hour >= 17 && h.hour <= 21).length);
+
+    // Best continuous run
+    let bestWindowStart: number | null = null;
+    let bestWindowEnd: number | null = null;
+    let currentRun = 0, bestRun = 0, runStart = 0;
+    for (const h of hours) {
+      const pl = classifyPollen(h.birch, h.grass);
+      const { friendly } = analyzeConditions(h.temp, h.humidity, h.windSpeed, h.weatherCode, h.precipProbability, h.aqi, pl, h.hour, settings);
+      if (friendly) {
+        if (currentRun === 0) runStart = h.hour;
+        currentRun++;
+        if (currentRun > bestRun) { bestRun = currentRun; bestWindowStart = runStart; bestWindowEnd = h.hour; }
+      } else { currentRun = 0; }
+    }
+
+    // Strategy
+    const strategy: "both" | "morning" | "evening" | "throughout" | "none" =
+      friendlyHours.length === 0 ? "none"
+      : friendlyHours.length >= 10 ? "throughout"
+      : morningWindowHours >= 2 && eveningWindowHours >= 2 ? "both"
+      : morningWindowHours >= 2 ? "morning"
+      : eveningWindowHours >= 2 ? "evening"
+      : "none";
+
+    // Recommendation
+    let overallRecommendation: string;
+    if (strategy === "none") {
+      const reasons = [];
+      if (maxPrecipProbability > settings.maxRainChance) reasons.push("rain");
+      if (maxAqiDay > settings.maxAqi) reasons.push("poor air quality");
+      if (pollenLevel === "high" || pollenLevel === "very-high") reasons.push("high pollen");
+      if (highTemp > settings.maxTemp) reasons.push("heat");
+      overallRecommendation = reasons.length > 0
+        ? `Keep windows closed — ${reasons.join(" and ")} expected.`
+        : "Conditions aren't suitable for open windows today.";
+    } else if (strategy === "throughout") {
+      overallRecommendation = `Great day — windows can stay open most of the day (${friendlyHours.length} good hours).`;
+    } else if (strategy === "both") {
+      overallRecommendation = `Use the open-close strategy: flush the house in the morning (${morningWindowHours}h), close mid-day, reopen in the evening (${eveningWindowHours}h).`;
+    } else if (strategy === "morning") {
+      overallRecommendation = `Open windows early morning (${morningWindowHours} good hour${morningWindowHours !== 1 ? "s" : ""}) before the heat builds. Close by mid-morning.`;
+    } else {
+      overallRecommendation = `Evening is the best window (${eveningWindowHours} good hour${eveningWindowHours !== 1 ? "s" : ""}) — conditions improve after the afternoon heat.`;
+    }
+
+    const dayOfWeek = new Date(date + "T12:00:00").getDay();
+
+    return {
+      date,
+      dayName: DAYS[dayOfWeek],
+      highTemp,
+      lowTemp,
+      maxPrecipProbability,
+      weatherCode,
+      weatherDescription: getWeatherDescription(weatherCode),
+      airQualityIndex: maxAqiDay,
+      pollenLevel,
+      friendlyHoursCount: friendlyHours.length,
+      morningWindowHours,
+      eveningWindowHours,
+      bestWindowStart,
+      bestWindowEnd,
+      strategy,
+      overallRecommendation,
+    };
+  });
+
+  return res.json({ days });
 });
 
 export default router;

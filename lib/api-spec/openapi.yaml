@@ -102,6 +102,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/TodaySummary"
 
+  /weather/weekly:
+    get:
+      operationId: getWeeklyForecast
+      tags: [weather]
+      summary: Get 7-day window forecast
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: 7-day forecast with per-day window strategy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeeklyForecast"
+
   /settings:
     get:
       operationId: getSettings
@@ -273,6 +297,72 @@ components:
         - precipitationProbability
         - airQualityIndex
         - pollenLevel
+
+    DayForecast:
+      type: object
+      properties:
+        date:
+          type: string
+        dayName:
+          type: string
+        highTemp:
+          type: number
+        lowTemp:
+          type: number
+        maxPrecipProbability:
+          type: integer
+        weatherCode:
+          type: integer
+        weatherDescription:
+          type: string
+        airQualityIndex:
+          type: integer
+        pollenLevel:
+          type: string
+          enum: [low, moderate, high, very-high]
+        friendlyHoursCount:
+          type: integer
+        morningWindowHours:
+          type: integer
+        eveningWindowHours:
+          type: integer
+        bestWindowStart:
+          type: integer
+          nullable: true
+        bestWindowEnd:
+          type: integer
+          nullable: true
+        strategy:
+          type: string
+          enum: [both, morning, evening, throughout, none]
+        overallRecommendation:
+          type: string
+      required:
+        - date
+        - dayName
+        - highTemp
+        - lowTemp
+        - maxPrecipProbability
+        - weatherCode
+        - weatherDescription
+        - airQualityIndex
+        - pollenLevel
+        - friendlyHoursCount
+        - morningWindowHours
+        - eveningWindowHours
+        - bestWindowStart
+        - bestWindowEnd
+        - strategy
+        - overallRecommendation
+
+    WeeklyForecast:
+      type: object
+      properties:
+        days:
+          type: array
+          items:
+            $ref: "#/components/schemas/DayForecast"
+      required: [days]
 
     WeatherForecast:
       type: object
