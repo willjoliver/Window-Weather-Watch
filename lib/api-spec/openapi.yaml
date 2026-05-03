@@ -3,20 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Window Weather Notifier API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: weather
+    description: Weather data and recommendations
+  - name: settings
+    description: User preferences and thresholds
+  - name: events
+    description: Window open/close event log
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,161 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /weather/current:
+    get:
+      operationId: getCurrentWeather
+      tags: [weather]
+      summary: Get current weather and window recommendation
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Current weather with window recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentWeather"
+
+  /weather/forecast:
+    get:
+      operationId: getWeatherForecast
+      tags: [weather]
+      summary: Get today's hourly weather forecast
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Hourly forecast for today
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeatherForecast"
+
+  /weather/today-summary:
+    get:
+      operationId: getTodaySummary
+      tags: [weather]
+      summary: Summary of window-friendly hours today
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Today summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodaySummary"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get user settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /events:
+    get:
+      operationId: getEvents
+      tags: [events]
+      summary: Get window event history
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WindowEvent"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Log a window open or close event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWindowEvent"
+      responses:
+        "201":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowEvent"
+
+  /events/stats:
+    get:
+      operationId: getEventStats
+      tags: [events]
+      summary: Get window event stats for this week
+      responses:
+        "200":
+          description: Event statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStats"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +191,258 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    CurrentWeather:
+      type: object
+      properties:
+        temperature:
+          type: number
+          description: Temperature in Celsius
+        humidity:
+          type: number
+          description: Relative humidity in percent
+        windSpeed:
+          type: number
+          description: Wind speed in km/h
+        weatherCode:
+          type: integer
+          description: WMO weather code
+        weatherDescription:
+          type: string
+        isWindowFriendly:
+          type: boolean
+          description: Whether conditions are suitable for an open window
+        recommendation:
+          type: string
+          description: Human-readable recommendation
+        reasons:
+          type: array
+          items:
+            type: string
+          description: Reasons why window is or isn't recommended
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - temperature
+        - humidity
+        - windSpeed
+        - weatherCode
+        - weatherDescription
+        - isWindowFriendly
+        - recommendation
+        - reasons
+        - timestamp
+
+    HourlyWeather:
+      type: object
+      properties:
+        hour:
+          type: integer
+        temperature:
+          type: number
+        humidity:
+          type: number
+        windSpeed:
+          type: number
+        isWindowFriendly:
+          type: boolean
+        weatherCode:
+          type: integer
+      required:
+        - hour
+        - temperature
+        - humidity
+        - windSpeed
+        - isWindowFriendly
+        - weatherCode
+
+    WeatherForecast:
+      type: object
+      properties:
+        date:
+          type: string
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/HourlyWeather"
+      required: [date, hours]
+
+    TodaySummary:
+      type: object
+      properties:
+        date:
+          type: string
+        friendlyHoursCount:
+          type: integer
+        bestWindowStart:
+          type: integer
+          nullable: true
+          description: Hour of day (0-23) when best window-open period begins
+        bestWindowEnd:
+          type: integer
+          nullable: true
+        minTemp:
+          type: number
+        maxTemp:
+          type: number
+        overallRecommendation:
+          type: string
+      required:
+        - date
+        - friendlyHoursCount
+        - bestWindowStart
+        - bestWindowEnd
+        - minTemp
+        - maxTemp
+        - overallRecommendation
+
+    Settings:
+      type: object
+      properties:
+        id:
+          type: integer
+        minTemp:
+          type: number
+          description: Minimum comfortable temperature (Celsius)
+        maxTemp:
+          type: number
+          description: Maximum comfortable temperature (Celsius)
+        maxHumidity:
+          type: number
+          description: Maximum acceptable humidity (%)
+        maxWindSpeed:
+          type: number
+          description: Maximum acceptable wind speed (km/h)
+        workDays:
+          type: array
+          items:
+            type: integer
+          description: "Work days as integers: 0=Sun, 1=Mon, ..., 6=Sat"
+        workStartHour:
+          type: integer
+          description: Work start hour (0-23)
+        workEndHour:
+          type: integer
+          description: Work end hour (0-23)
+        notificationsEnabled:
+          type: boolean
+        checkIntervalMinutes:
+          type: integer
+          description: How often to check weather in minutes
+      required:
+        - id
+        - minTemp
+        - maxTemp
+        - maxHumidity
+        - maxWindSpeed
+        - workDays
+        - workStartHour
+        - workEndHour
+        - notificationsEnabled
+        - checkIntervalMinutes
+
+    SettingsUpdate:
+      type: object
+      properties:
+        minTemp:
+          type: number
+        maxTemp:
+          type: number
+        maxHumidity:
+          type: number
+        maxWindSpeed:
+          type: number
+        workDays:
+          type: array
+          items:
+            type: integer
+        workStartHour:
+          type: integer
+        workEndHour:
+          type: integer
+        notificationsEnabled:
+          type: boolean
+        checkIntervalMinutes:
+          type: integer
+
+    WindowEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+          enum: [opened, closed]
+        triggeredBy:
+          type: string
+          enum: [user, auto]
+          description: Whether event was manual or triggered by weather check
+        temperature:
+          type: number
+          nullable: true
+        humidity:
+          type: number
+          nullable: true
+        windSpeed:
+          type: number
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - action
+        - triggeredBy
+        - createdAt
+
+    CreateWindowEvent:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [opened, closed]
+        triggeredBy:
+          type: string
+          enum: [user, auto]
+        temperature:
+          type: number
+          nullable: true
+        humidity:
+          type: number
+          nullable: true
+        windSpeed:
+          type: number
+          nullable: true
+        note:
+          type: string
+          nullable: true
+      required:
+        - action
+        - triggeredBy
+
+    EventStats:
+      type: object
+      properties:
+        totalOpens:
+          type: integer
+        totalCloses:
+          type: integer
+        avgOpenDurationMinutes:
+          type: number
+          nullable: true
+        mostCommonOpenHour:
+          type: integer
+          nullable: true
+        daysWithWindowOpen:
+          type: integer
+      required:
+        - totalOpens
+        - totalCloses
+        - avgOpenDurationMinutes
+        - mostCommonOpenHour
+        - daysWithWindowOpen
