@@ -206,6 +206,8 @@ components:
           type: integer
         weatherDescription:
           type: string
+        precipitationProbability:
+          type: integer
         isWindowFriendly:
           type: boolean
         recommendation:
@@ -223,6 +225,7 @@ components:
         - windSpeed
         - weatherCode
         - weatherDescription
+        - precipitationProbability
         - isWindowFriendly
         - recommendation
         - reasons
@@ -243,6 +246,8 @@ components:
           type: boolean
         weatherCode:
           type: integer
+        precipitationProbability:
+          type: integer
       required:
         - hour
         - temperature
@@ -250,6 +255,7 @@ components:
         - windSpeed
         - isWindowFriendly
         - weatherCode
+        - precipitationProbability
 
     WeatherForecast:
       type: object
@@ -303,6 +309,8 @@ components:
           type: number
         maxWindSpeed:
           type: number
+        maxRainChance:
+          type: integer
         workDays:
           type: array
           items:
@@ -330,6 +338,7 @@ components:
         - maxTemp
         - maxHumidity
         - maxWindSpeed
+        - maxRainChance
         - workDays
         - workStartHour
         - workEndHour
@@ -350,6 +359,8 @@ components:
           type: number
         maxWindSpeed:
           type: number
+        maxRainChance:
+          type: integer
         workDays:
           type: array
           items:

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Thermometer, Droplets, Wind, Clock, RefreshCw,
-  BellOff, Bell, MapPin, CheckCircle, XCircle, ChevronRight
+  BellOff, Bell, MapPin, CheckCircle, XCircle, ChevronRight, CloudRain
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,24 +30,26 @@ function WeatherMetric({
   value,
   unit,
   loading,
+  highlight,
 }: {
   icon: React.ElementType;
   label: string;
   value?: number | null;
   unit: string;
   loading: boolean;
+  highlight?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1" data-testid={`metric-${label.toLowerCase().replace(/ /g, "-")}`}>
+    <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium uppercase tracking-wide">
-        <Icon className="w-3.5 h-3.5" />
-        {label}
+        <Icon className={cn("w-3.5 h-3.5", highlight && "text-sky-500")} />
+        <span className={highlight ? "text-sky-600 dark:text-sky-400" : ""}>{label}</span>
       </div>
       {loading ? (
         <Skeleton className="h-7 w-20" />
       ) : (
-        <div className="text-2xl font-semibold text-foreground">
-          {value !== undefined && value !== null ? value.toFixed(1) : "—"}
+        <div className={cn("text-2xl font-semibold", highlight ? "text-sky-600 dark:text-sky-400" : "text-foreground")}>
+          {value !== undefined && value !== null ? (unit === "%" && label === "Rain chance" ? `${value}` : value.toFixed(label === "Rain chance" ? 0 : 1)) : "—"}
           <span className="text-sm font-normal text-muted-foreground ml-1">{unit}</span>
         </div>
       )}
@@ -95,9 +97,7 @@ export default function Dashboard() {
       if (fresh !== undefined && prevFriendly.current !== null && fresh !== prevFriendly.current) {
         if (Notification.permission === "granted") {
           new Notification(fresh ? "Open your window!" : "Close your window", {
-            body: fresh
-              ? "Conditions are great right now."
-              : result.data?.recommendation ?? "Conditions have changed.",
+            body: fresh ? "Conditions are great right now." : result.data?.recommendation ?? "Conditions have changed.",
             icon: "/favicon.ico",
           });
         }
@@ -146,6 +146,7 @@ export default function Dashboard() {
   const friendly = weather?.isWindowFriendly;
   const nowHour = new Date().getHours();
   const hourlyItems = forecast?.hours?.slice(0, 12) ?? [];
+  const rainChance = weather?.precipitationProbability ?? 0;
 
   return (
     <div className="p-8 max-w-4xl">
@@ -166,9 +167,7 @@ export default function Dashboard() {
               ) : locationName ? (
                 <>
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <p className="text-sm text-muted-foreground truncate max-w-xs" data-testid="text-location-name">
-                    {locationName}
-                  </p>
+                  <p className="text-sm text-muted-foreground truncate max-w-xs">{locationName}</p>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -182,19 +181,18 @@ export default function Dashboard() {
               variant="outline"
               size="sm"
               onClick={toggleMonitoring}
-              data-testid="button-toggle-monitoring"
               className={cn(monitoring && "border-primary text-primary bg-primary/5")}
             >
               {monitoring ? <Bell className="w-4 h-4 mr-1.5" /> : <BellOff className="w-4 h-4 mr-1.5" />}
               {monitoring ? "Monitoring on" : "Monitor off"}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => refetchWeather()} data-testid="button-refresh">
+            <Button variant="ghost" size="icon" onClick={() => refetchWeather()}>
               <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        {/* No location configured */}
+        {/* No location */}
         {!settingsLoading && !enabled && (
           <Card className="p-6 mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
             <div className="flex items-center gap-3">
@@ -253,7 +251,6 @@ export default function Dashboard() {
                               key={i}
                               variant={friendly ? "default" : "secondary"}
                               className="text-xs font-normal"
-                              data-testid={`badge-reason-${i}`}
                             >
                               {r}
                             </Badge>
@@ -269,7 +266,6 @@ export default function Dashboard() {
                   size="sm"
                   variant={windowState === "open" ? "default" : "outline"}
                   onClick={() => logWindowAction("opened")}
-                  data-testid="button-log-open"
                   disabled={createEvent.isPending || !enabled}
                 >
                   Open
@@ -278,7 +274,6 @@ export default function Dashboard() {
                   size="sm"
                   variant={windowState === "closed" ? "default" : "outline"}
                   onClick={() => logWindowAction("closed")}
-                  data-testid="button-log-close"
                   disabled={createEvent.isPending || !enabled}
                 >
                   Close
@@ -287,10 +282,18 @@ export default function Dashboard() {
             </div>
 
             {/* Metrics row */}
-            <div className="grid grid-cols-3 gap-6 pt-4 border-t border-border">
-              <WeatherMetric icon={Thermometer} label="Temperature" value={weather?.temperature} unit="°C" loading={weatherLoading} />
+            <div className="grid grid-cols-4 gap-6 pt-4 border-t border-border">
+              <WeatherMetric icon={Thermometer} label="Temperature" value={weather?.temperature} unit="°F" loading={weatherLoading} />
               <WeatherMetric icon={Droplets} label="Humidity" value={weather?.humidity} unit="%" loading={weatherLoading} />
-              <WeatherMetric icon={Wind} label="Wind speed" value={weather?.windSpeed} unit="km/h" loading={weatherLoading} />
+              <WeatherMetric icon={Wind} label="Wind speed" value={weather?.windSpeed} unit="mph" loading={weatherLoading} />
+              <WeatherMetric
+                icon={CloudRain}
+                label="Rain chance"
+                value={rainChance}
+                unit="%"
+                loading={weatherLoading}
+                highlight={rainChance > (settings?.maxRainChance ?? 40)}
+              />
             </div>
           </div>
         </Card>
@@ -321,7 +324,7 @@ export default function Dashboard() {
                 <div>
                   <span className="text-muted-foreground">Range: </span>
                   <span className="font-medium">
-                    {summary.minTemp?.toFixed(1)}°C – {summary.maxTemp?.toFixed(1)}°C
+                    {summary.minTemp?.toFixed(0)}°F – {summary.maxTemp?.toFixed(0)}°F
                   </span>
                 </div>
               </div>
@@ -335,7 +338,7 @@ export default function Dashboard() {
           {forecastLoading || (enabled && hourlyItems.length === 0) ? (
             <div className="flex gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-14 rounded-lg" />
+                <Skeleton key={i} className="h-20 w-14 rounded-lg" />
               ))}
             </div>
           ) : !enabled ? (
@@ -344,15 +347,15 @@ export default function Dashboard() {
             <div className="flex gap-2 overflow-x-auto pb-1">
               {hourlyItems.map((h, i) => {
                 const isNow = h.hour === nowHour;
+                const hasRain = h.precipitationProbability > (settings?.maxRainChance ?? 40);
                 return (
                   <motion.div
                     key={h.hour}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.04 }}
-                    data-testid={`forecast-hour-${h.hour}`}
                     className={cn(
-                      "shrink-0 w-14 rounded-xl flex flex-col items-center gap-1 py-2.5 px-1 border text-center",
+                      "shrink-0 w-16 rounded-xl flex flex-col items-center gap-1 py-2.5 px-1 border text-center",
                       isNow && "border-primary bg-primary/5",
                       !isNow && h.isWindowFriendly && "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
                       !isNow && !h.isWindowFriendly && "bg-muted border-border"
@@ -360,10 +363,17 @@ export default function Dashboard() {
                   >
                     <span className="text-xs text-muted-foreground font-medium">{h.hour}:00</span>
                     <span className="text-sm font-semibold">{h.temperature.toFixed(0)}°</span>
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      h.isWindowFriendly ? "bg-emerald-500" : "bg-muted-foreground/30"
-                    )} />
+                    {hasRain ? (
+                      <div className="flex items-center gap-0.5">
+                        <CloudRain className="w-3 h-3 text-sky-500" />
+                        <span className="text-xs text-sky-600 dark:text-sky-400">{h.precipitationProbability}%</span>
+                      </div>
+                    ) : (
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        h.isWindowFriendly ? "bg-emerald-500" : "bg-muted-foreground/30"
+                      )} />
+                    )}
                   </motion.div>
                 );
               })}
@@ -371,6 +381,7 @@ export default function Dashboard() {
           )}
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Window-friendly</div>
+            <div className="flex items-center gap-1.5"><CloudRain className="w-3 h-3 text-sky-500" /> Rain forecast</div>
             <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-muted-foreground/30" /> Not recommended</div>
           </div>
         </Card>

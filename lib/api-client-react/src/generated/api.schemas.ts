@@ -15,6 +15,7 @@ export interface CurrentWeather {
   windSpeed: number;
   weatherCode: number;
   weatherDescription: string;
+  precipitationProbability: number;
   isWindowFriendly: boolean;
   recommendation: string;
   reasons: string[];
@@ -28,6 +29,7 @@ export interface HourlyWeather {
   windSpeed: number;
   isWindowFriendly: boolean;
   weatherCode: number;
+  precipitationProbability: number;
 }
 
 export interface WeatherForecast {
@@ -51,6 +53,7 @@ export interface Settings {
   maxTemp: number;
   maxHumidity: number;
   maxWindSpeed: number;
+  maxRainChance: number;
   workDays: number[];
   workStartHour: number;
   workEndHour: number;
@@ -66,6 +69,7 @@ export interface SettingsUpdate {
   maxTemp?: number;
   maxHumidity?: number;
   maxWindSpeed?: number;
+  maxRainChance?: number;
   workDays?: number[];
   workStartHour?: number;
   workEndHour?: number;

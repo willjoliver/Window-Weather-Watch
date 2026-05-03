@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Save, Bell, Thermometer, Droplets, Wind, Clock, Calendar, MapPin, Search, Loader2 } from "lucide-react";
+import { Save, Bell, Thermometer, Droplets, Wind, Clock, Calendar, MapPin, Search, Loader2, CloudRain } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -12,16 +12,24 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { useGetSettings, useUpdateSettings, getGetSettingsQueryKey, getGetCurrentWeatherQueryKey, getGetWeatherForecastQueryKey, getGetTodaySummaryQueryKey } from "@workspace/api-client-react";
+import {
+  useGetSettings,
+  useUpdateSettings,
+  getGetSettingsQueryKey,
+  getGetCurrentWeatherQueryKey,
+  getGetWeatherForecastQueryKey,
+  getGetTodaySummaryQueryKey,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const schema = z.object({
-  minTemp: z.number().min(-20).max(40),
-  maxTemp: z.number().min(-20).max(40),
+  minTemp: z.number().min(-20).max(120),
+  maxTemp: z.number().min(-20).max(120),
   maxHumidity: z.number().min(10).max(100),
-  maxWindSpeed: z.number().min(0).max(120),
+  maxWindSpeed: z.number().min(0).max(80),
+  maxRainChance: z.number().min(0).max(100),
   workDays: z.array(z.number()).min(1, "Select at least one work day"),
   workStartHour: z.number().min(0).max(23),
   workEndHour: z.number().min(1).max(24),
@@ -60,10 +68,11 @@ export default function Settings() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      minTemp: 16,
-      maxTemp: 26,
+      minTemp: 61,
+      maxTemp: 79,
       maxHumidity: 70,
-      maxWindSpeed: 30,
+      maxWindSpeed: 20,
+      maxRainChance: 40,
       workDays: [1, 2, 3, 4, 5],
       workStartHour: 8,
       workEndHour: 18,
@@ -82,6 +91,7 @@ export default function Settings() {
         maxTemp: settings.maxTemp,
         maxHumidity: settings.maxHumidity,
         maxWindSpeed: settings.maxWindSpeed,
+        maxRainChance: settings.maxRainChance,
         workDays: settings.workDays as number[],
         workStartHour: settings.workStartHour,
         workEndHour: settings.workEndHour,
@@ -169,7 +179,6 @@ export default function Settings() {
                       onChange={(e) => setAddressInput(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleGeocode())}
                       placeholder="Enter your address…"
-                      data-testid="input-address"
                       className="flex-1"
                     />
                     <Button
@@ -177,13 +186,12 @@ export default function Settings() {
                       variant="secondary"
                       onClick={handleGeocode}
                       disabled={geocoding || !addressInput.trim()}
-                      data-testid="button-geocode"
                     >
                       {geocoding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                     </Button>
                   </div>
                   {currentLat !== null && currentLon !== null ? (
-                    <p className="text-xs text-muted-foreground" data-testid="text-coordinates">
+                    <p className="text-xs text-muted-foreground">
                       Coordinates: {currentLat?.toFixed(4)}°N, {Math.abs(currentLon ?? 0).toFixed(4)}°W
                     </p>
                   ) : (
@@ -196,7 +204,7 @@ export default function Settings() {
               <Card className="p-5">
                 <div className="flex items-center gap-2 mb-5">
                   <Thermometer className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold text-sm">Temperature range</h2>
+                  <h2 className="font-semibold text-sm">Temperature range (°F)</h2>
                 </div>
                 <div className="space-y-5">
                   <FormField
@@ -206,10 +214,10 @@ export default function Settings() {
                       <FormItem>
                         <div className="flex justify-between items-center mb-2">
                           <FormLabel className="text-sm">Minimum temperature</FormLabel>
-                          <span className="text-sm font-semibold text-primary" data-testid="value-min-temp">{field.value}°C</span>
+                          <span className="text-sm font-semibold text-primary">{field.value}°F</span>
                         </div>
                         <FormControl>
-                          <Slider min={-10} max={30} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-min-temp" />
+                          <Slider min={20} max={75} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                         </FormControl>
                         <FormDescription className="text-xs">Close window alert below this temperature</FormDescription>
                       </FormItem>
@@ -222,10 +230,10 @@ export default function Settings() {
                       <FormItem>
                         <div className="flex justify-between items-center mb-2">
                           <FormLabel className="text-sm">Maximum temperature</FormLabel>
-                          <span className="text-sm font-semibold text-primary" data-testid="value-max-temp">{field.value}°C</span>
+                          <span className="text-sm font-semibold text-primary">{field.value}°F</span>
                         </div>
                         <FormControl>
-                          <Slider min={10} max={40} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-max-temp" />
+                          <Slider min={60} max={100} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                         </FormControl>
                         <FormDescription className="text-xs">Close window alert above this temperature</FormDescription>
                       </FormItem>
@@ -234,11 +242,11 @@ export default function Settings() {
                 </div>
               </Card>
 
-              {/* Humidity & Wind */}
+              {/* Humidity, Wind & Rain */}
               <Card className="p-5">
                 <div className="flex items-center gap-2 mb-5">
                   <Droplets className="w-4 h-4 text-primary" />
-                  <h2 className="font-semibold text-sm">Humidity &amp; wind</h2>
+                  <h2 className="font-semibold text-sm">Humidity, wind &amp; rain</h2>
                 </div>
                 <div className="space-y-5">
                   <FormField
@@ -248,10 +256,10 @@ export default function Settings() {
                       <FormItem>
                         <div className="flex justify-between items-center mb-2">
                           <FormLabel className="text-sm">Maximum humidity</FormLabel>
-                          <span className="text-sm font-semibold text-primary" data-testid="value-max-humidity">{field.value}%</span>
+                          <span className="text-sm font-semibold text-primary">{field.value}%</span>
                         </div>
                         <FormControl>
-                          <Slider min={30} max={100} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-max-humidity" />
+                          <Slider min={30} max={100} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -266,11 +274,30 @@ export default function Settings() {
                             <Wind className="w-3.5 h-3.5 text-muted-foreground" />
                             <FormLabel className="text-sm">Maximum wind speed</FormLabel>
                           </div>
-                          <span className="text-sm font-semibold text-primary" data-testid="value-max-wind">{field.value} km/h</span>
+                          <span className="text-sm font-semibold text-primary">{field.value} mph</span>
                         </div>
                         <FormControl>
-                          <Slider min={0} max={80} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-max-wind" />
+                          <Slider min={0} max={60} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                         </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="maxRainChance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center gap-1.5">
+                            <CloudRain className="w-3.5 h-3.5 text-muted-foreground" />
+                            <FormLabel className="text-sm">Max rain probability</FormLabel>
+                          </div>
+                          <span className="text-sm font-semibold text-primary">{field.value}%</span>
+                        </div>
+                        <FormControl>
+                          <Slider min={0} max={100} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
+                        </FormControl>
+                        <FormDescription className="text-xs">Close window alert above this rain chance</FormDescription>
                       </FormItem>
                     )}
                   />
@@ -296,7 +323,6 @@ export default function Settings() {
                             <button
                               key={day}
                               type="button"
-                              data-testid={`day-${day.toLowerCase()}`}
                               onClick={() => {
                                 if (active) {
                                   field.onChange(field.value.filter((d) => d !== idx));
@@ -329,10 +355,10 @@ export default function Settings() {
                             <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                             <FormLabel className="text-sm">Start hour</FormLabel>
                           </div>
-                          <span className="text-sm font-semibold text-primary" data-testid="value-start-hour">{field.value}:00</span>
+                          <span className="text-sm font-semibold text-primary">{field.value}:00</span>
                         </div>
                         <FormControl>
-                          <Slider min={0} max={12} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-start-hour" />
+                          <Slider min={0} max={12} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -344,10 +370,10 @@ export default function Settings() {
                       <FormItem>
                         <div className="flex justify-between items-center mb-2">
                           <FormLabel className="text-sm">End hour</FormLabel>
-                          <span className="text-sm font-semibold text-primary" data-testid="value-end-hour">{field.value}:00</span>
+                          <span className="text-sm font-semibold text-primary">{field.value}:00</span>
                         </div>
                         <FormControl>
-                          <Slider min={12} max={24} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-end-hour" />
+                          <Slider min={12} max={24} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -371,7 +397,7 @@ export default function Settings() {
                         <FormDescription className="text-xs">Get browser alerts when window conditions change</FormDescription>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-notifications" />
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -383,17 +409,17 @@ export default function Settings() {
                     <FormItem>
                       <div className="flex justify-between items-center mb-2">
                         <FormLabel className="text-sm">Check interval</FormLabel>
-                        <span className="text-sm font-semibold text-primary" data-testid="value-interval">every {field.value} min</span>
+                        <span className="text-sm font-semibold text-primary">every {field.value} min</span>
                       </div>
                       <FormControl>
-                        <Slider min={5} max={60} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} data-testid="slider-interval" />
+                        <Slider min={5} max={60} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </Card>
 
-              <Button type="submit" className="w-full" disabled={updateSettings.isPending} data-testid="button-save-settings">
+              <Button type="submit" className="w-full" disabled={updateSettings.isPending}>
                 <Save className="w-4 h-4 mr-2" />
                 {updateSettings.isPending ? "Saving…" : "Save settings"}
               </Button>

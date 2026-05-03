@@ -12,6 +12,7 @@ export interface CurrentWeather {
   windSpeed: number;
   weatherCode: number;
   weatherDescription: string;
+  precipitationProbability: number;
   isWindowFriendly: boolean;
   recommendation: string;
   reasons: string[];

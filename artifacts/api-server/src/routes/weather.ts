@@ -10,8 +10,8 @@ function getWeatherDescription(code: number): string {
   if (code === 3) return "Overcast";
   if (code <= 49) return "Foggy";
   if (code <= 59) return "Drizzle";
-  if (code <= 69) return "Rainy";
-  if (code <= 79) return "Snowy";
+  if (code <= 69) return "Rain";
+  if (code <= 79) return "Snow";
   if (code <= 84) return "Rain showers";
   if (code <= 94) return "Thunderstorm";
   return "Severe thunderstorm";
@@ -22,35 +22,53 @@ function isWindowFriendly(
   humidity: number,
   windSpeed: number,
   weatherCode: number,
-  settings: { minTemp: number; maxTemp: number; maxHumidity: number; maxWindSpeed: number }
+  precipProbability: number,
+  settings: {
+    minTemp: number;
+    maxTemp: number;
+    maxHumidity: number;
+    maxWindSpeed: number;
+    maxRainChance: number;
+  }
 ): { friendly: boolean; reasons: string[] } {
   const reasons: string[] = [];
 
   if (temp < settings.minTemp) {
-    reasons.push(`Too cold (${temp.toFixed(1)}°C, min is ${settings.minTemp}°C)`);
+    reasons.push(`Too cold (${temp.toFixed(0)}°F, min is ${settings.minTemp}°F)`);
   }
   if (temp > settings.maxTemp) {
-    reasons.push(`Too warm (${temp.toFixed(1)}°C, max is ${settings.maxTemp}°C)`);
+    reasons.push(`Too warm (${temp.toFixed(0)}°F, max is ${settings.maxTemp}°F)`);
   }
   if (humidity > settings.maxHumidity) {
     reasons.push(`Too humid (${humidity.toFixed(0)}%, max is ${settings.maxHumidity}%)`);
   }
   if (windSpeed > settings.maxWindSpeed) {
-    reasons.push(`Too windy (${windSpeed.toFixed(1)} km/h, max is ${settings.maxWindSpeed} km/h)`);
+    reasons.push(`Too windy (${windSpeed.toFixed(0)} mph, max is ${settings.maxWindSpeed} mph)`);
+  }
+  if (precipProbability > settings.maxRainChance) {
+    reasons.push(`${precipProbability}% chance of rain`);
   }
   if (weatherCode >= 50 && weatherCode <= 99) {
-    reasons.push("Precipitation or storms outside");
+    reasons.push("Precipitation or storms in the area");
   }
 
   if (reasons.length === 0) {
-    reasons.push(`Conditions are ideal — ${temp.toFixed(1)}°C, ${humidity.toFixed(0)}% humidity`);
+    reasons.push(`Conditions are ideal — ${temp.toFixed(0)}°F, ${humidity.toFixed(0)}% humidity`);
   }
 
-  return { friendly: reasons.length === 1 && !reasons[0].startsWith("Too") && !reasons[0].startsWith("Precipitation"), reasons };
+  return { friendly: reasons.length === 1 && reasons[0].startsWith("Conditions are ideal"), reasons };
 }
 
 async function fetchOpenMeteo(lat: number, lon: number) {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto&forecast_days=1`;
+  const url = [
+    `https://api.open-meteo.com/v1/forecast`,
+    `?latitude=${lat}&longitude=${lon}`,
+    `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`,
+    `&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,precipitation_probability`,
+    `&timezone=auto&forecast_days=1`,
+    `&temperature_unit=fahrenheit&wind_speed_unit=mph`,
+  ].join("");
+
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch weather data");
   return res.json() as Promise<{
@@ -67,6 +85,7 @@ async function fetchOpenMeteo(lat: number, lon: number) {
       relative_humidity_2m: number[];
       wind_speed_10m: number[];
       weather_code: number[];
+      precipitation_probability: number[];
     };
   }>;
 }
@@ -88,13 +107,19 @@ router.get("/weather/current", async (req, res) => {
   const { lat, lon } = parsed.data;
   const settings = await getSettings();
   const data = await fetchOpenMeteo(lat, lon);
-  const { current } = data;
+  const { current, hourly } = data;
+
+  // Get precipitation probability for the current hour from hourly data
+  const nowStr = current.time.substring(0, 13); // "2026-05-03T13"
+  const currentHourIdx = hourly.time.findIndex((t) => t.startsWith(nowStr));
+  const precipProbability = currentHourIdx >= 0 ? (hourly.precipitation_probability[currentHourIdx] ?? 0) : 0;
 
   const { friendly, reasons } = isWindowFriendly(
     current.temperature_2m,
     current.relative_humidity_2m,
     current.wind_speed_10m,
     current.weather_code,
+    precipProbability,
     settings
   );
 
@@ -104,6 +129,7 @@ router.get("/weather/current", async (req, res) => {
     windSpeed: current.wind_speed_10m,
     weatherCode: current.weather_code,
     weatherDescription: getWeatherDescription(current.weather_code),
+    precipitationProbability: precipProbability,
     isWindowFriendly: friendly,
     recommendation: friendly
       ? "Great time to open your window!"
@@ -129,8 +155,9 @@ router.get("/weather/forecast", async (req, res) => {
     const humidity = hourly.relative_humidity_2m[i];
     const windSpeed = hourly.wind_speed_10m[i];
     const weatherCode = hourly.weather_code[i];
-    const { friendly } = isWindowFriendly(temp, humidity, windSpeed, weatherCode, settings);
-    return { hour, temperature: temp, humidity, windSpeed, isWindowFriendly: friendly, weatherCode };
+    const precipProbability = hourly.precipitation_probability[i] ?? 0;
+    const { friendly } = isWindowFriendly(temp, humidity, windSpeed, weatherCode, precipProbability, settings);
+    return { hour, temperature: temp, humidity, windSpeed, isWindowFriendly: friendly, weatherCode, precipitationProbability: precipProbability };
   });
 
   return res.json({
@@ -155,7 +182,8 @@ router.get("/weather/today-summary", async (req, res) => {
     const humidity = hourly.relative_humidity_2m[i];
     const windSpeed = hourly.wind_speed_10m[i];
     const weatherCode = hourly.weather_code[i];
-    const { friendly } = isWindowFriendly(temp, humidity, windSpeed, weatherCode, settings);
+    const precipProbability = hourly.precipitation_probability[i] ?? 0;
+    const { friendly } = isWindowFriendly(temp, humidity, windSpeed, weatherCode, precipProbability, settings);
     return { hour, temperature: temp, isWindowFriendly: friendly };
   });
 

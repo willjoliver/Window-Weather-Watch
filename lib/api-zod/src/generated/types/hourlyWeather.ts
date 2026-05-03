@@ -13,4 +13,5 @@ export interface HourlyWeather {
   windSpeed: number;
   isWindowFriendly: boolean;
   weatherCode: number;
+  precipitationProbability: number;
 }

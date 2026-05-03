@@ -12,6 +12,7 @@ export interface Settings {
   maxTemp: number;
   maxHumidity: number;
   maxWindSpeed: number;
+  maxRainChance: number;
   workDays: number[];
   workStartHour: number;
   workEndHour: number;
