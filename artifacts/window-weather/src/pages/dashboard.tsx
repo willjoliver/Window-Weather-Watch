@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Thermometer, Droplets, Wind, Clock, RefreshCw,
   BellOff, Bell, MapPin, CheckCircle, XCircle, ChevronRight,
-  CloudRain, Leaf, Wind as WindIcon, Info
+  CloudRain, Leaf, Wind as WindIcon, Info, BellRing
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { usePush } from "@/hooks/use-push";
 import {
   useGetCurrentWeather,
   getGetCurrentWeatherQueryKey,
@@ -83,6 +84,7 @@ export default function Dashboard() {
   const [windowState, setWindowState] = useState<"open" | "closed" | null>(null);
   const prevFriendly = useRef<boolean | null>(null);
   const createEvent = useCreateEvent();
+  const push = usePush();
 
   const { data: settings, isLoading: settingsLoading } = useGetSettings({
     query: { queryKey: getGetSettingsQueryKey() },
@@ -190,6 +192,34 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Background push toggle — only show if supported and server has VAPID configured */}
+            {push.state !== "unsupported" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (push.state === "subscribed") {
+                    await push.unsubscribe();
+                    toast({ title: "Background notifications off" });
+                  } else {
+                    const ok = await push.subscribe();
+                    if (ok) {
+                      toast({ title: "Background notifications on", description: "You'll get notified even when this tab is closed." });
+                      push.sendTest();
+                    } else if (push.state === "denied") {
+                      toast({ title: "Notifications blocked", description: "Allow notifications in your browser settings.", variant: "destructive" });
+                    } else if (push.error) {
+                      toast({ title: "Push not available", description: push.error });
+                    }
+                  }
+                }}
+                className={cn(push.state === "subscribed" && "border-primary text-primary bg-primary/5")}
+                title={push.state === "subscribed" ? "Background push on — click to disable" : "Enable background push notifications"}
+              >
+                <BellRing className="w-4 h-4 mr-1.5" />
+                {push.state === "subscribed" ? "Push on" : "Push off"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={toggleMonitoring} className={cn(monitoring && "border-primary text-primary bg-primary/5")}>
               {monitoring ? <Bell className="w-4 h-4 mr-1.5" /> : <BellOff className="w-4 h-4 mr-1.5" />}
               {monitoring ? "Monitoring on" : "Monitor off"}
