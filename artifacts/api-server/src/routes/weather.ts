@@ -34,6 +34,134 @@ function classifyPollen(birch: number | null, grass: number | null): "low" | "mo
   return "very-high";
 }
 
+// ─── AccuWeather pollen cache ────────────────────────────────────────────────
+// Fetches once per 6 hours max — well within the free 50 calls/day limit.
+
+type AccuPollenCategory = "Low" | "Moderate" | "High" | "Very High";
+
+interface AccuPollenCache {
+  locationKey: string;
+  tree: AccuPollenCategory;
+  grass: AccuPollenCategory;
+  ragweed: AccuPollenCategory;
+  mold: AccuPollenCategory;
+  cachedAt: number; // Date.now()
+  lat: number;
+  lon: number;
+}
+
+let accuPollenCache: AccuPollenCache | null = null;
+const ACCU_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+function accuCategoryToLevel(cat: AccuPollenCategory): "low" | "moderate" | "high" | "very-high" {
+  if (cat === "Low") return "low";
+  if (cat === "Moderate") return "moderate";
+  if (cat === "High") return "high";
+  return "very-high";
+}
+
+function worstPollenLevel(
+  levels: Array<"low" | "moderate" | "high" | "very-high">
+): "low" | "moderate" | "high" | "very-high" {
+  const order = ["low", "moderate", "high", "very-high"] as const;
+  let worst = 0;
+  for (const l of levels) {
+    const idx = order.indexOf(l);
+    if (idx > worst) worst = idx;
+  }
+  return order[worst];
+}
+
+async function fetchAccuWeatherPollen(lat: number, lon: number): Promise<AccuPollenCache | null> {
+  const apiKey = process.env.ACCUWEATHER_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    // Step 1: get location key (skip if cached for same coords)
+    let locationKey = accuPollenCache?.locationKey;
+    const sameLocation =
+      accuPollenCache &&
+      Math.abs(accuPollenCache.lat - lat) < 0.01 &&
+      Math.abs(accuPollenCache.lon - lon) < 0.01;
+
+    if (!locationKey || !sameLocation) {
+      const locRes = await fetch(
+        `https://dataservice.accuweather.com/locations/v1/cities/geoposition/search?apikey=${apiKey}&q=${lat},${lon}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (!locRes.ok) return null;
+      const locData = await locRes.json() as { Key: string };
+      locationKey = locData.Key;
+    }
+
+    // Step 2: fetch 1-day daily forecast with details (includes AirAndPollen)
+    const fxRes = await fetch(
+      `https://dataservice.accuweather.com/forecasts/v1/daily/1day/${locationKey}?apikey=${apiKey}&details=true`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!fxRes.ok) return null;
+    const fxData = await fxRes.json() as {
+      DailyForecasts: Array<{
+        AirAndPollen: Array<{ Name: string; Category: string }>;
+      }>;
+    };
+
+    const airAndPollen = fxData.DailyForecasts?.[0]?.AirAndPollen ?? [];
+    const get = (name: string): AccuPollenCategory => {
+      const entry = airAndPollen.find((e) => e.Name === name);
+      const cat = entry?.Category ?? "Low";
+      return (["Low", "Moderate", "High", "Very High"].includes(cat) ? cat : "Low") as AccuPollenCategory;
+    };
+
+    return {
+      locationKey,
+      tree: get("Tree"),
+      grass: get("Grass"),
+      ragweed: get("Ragweed"),
+      mold: get("Mold"),
+      cachedAt: Date.now(),
+      lat,
+      lon,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function getPollenLevel(
+  lat: number,
+  lon: number,
+  fallbackBirch: number | null,
+  fallbackGrass: number | null
+): Promise<{ level: "low" | "moderate" | "high" | "very-high"; source: "accuweather" | "open-meteo" }> {
+  const apiKey = process.env.ACCUWEATHER_API_KEY;
+  if (apiKey) {
+    const now = Date.now();
+    const cacheValid =
+      accuPollenCache &&
+      now - accuPollenCache.cachedAt < ACCU_CACHE_TTL_MS &&
+      Math.abs(accuPollenCache.lat - lat) < 0.01 &&
+      Math.abs(accuPollenCache.lon - lon) < 0.01;
+
+    if (!cacheValid) {
+      const fresh = await fetchAccuWeatherPollen(lat, lon);
+      if (fresh) accuPollenCache = fresh;
+    }
+
+    if (accuPollenCache) {
+      const level = worstPollenLevel([
+        accuCategoryToLevel(accuPollenCache.tree),
+        accuCategoryToLevel(accuPollenCache.grass),
+        accuCategoryToLevel(accuPollenCache.ragweed),
+        accuCategoryToLevel(accuPollenCache.mold),
+      ]);
+      return { level, source: "accuweather" };
+    }
+  }
+
+  return { level: classifyPollen(fallbackBirch, fallbackGrass), source: "open-meteo" };
+}
+
 type Settings = {
   minTemp: number;
   maxTemp: number;
@@ -221,7 +349,7 @@ router.get("/weather/current", async (req, res) => {
   const aqi = aqData?.current?.us_aqi ?? 0;
   const birchPollen = aqData?.current?.birch_pollen ?? null;
   const grassPollen = aqData?.current?.grass_pollen ?? null;
-  const pollenLevel = classifyPollen(birchPollen, grassPollen);
+  const { level: pollenLevel } = await getPollenLevel(lat, lon, birchPollen, grassPollen);
 
   const hour = new Date(current.time).getHours();
 
