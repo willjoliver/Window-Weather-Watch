@@ -151,7 +151,14 @@ export default function Dashboard() {
 
   const friendly = weather?.isWindowFriendly;
   const nowHour = new Date().getHours();
-  const hourlyItems = forecast?.hours?.slice(0, 12) ?? [];
+  const hourlyItems = forecast?.hours ?? [];
+
+  function formatHour(hour: number): string {
+    if (hour === 0) return "12am";
+    if (hour < 12) return `${hour}am`;
+    if (hour === 12) return "12pm";
+    return `${hour - 12}pm`;
+  }
   const rainChance = weather?.precipitationProbability ?? 0;
   const aqi = weather?.airQualityIndex ?? 0;
   const pollenLevel = (weather?.pollenLevel ?? "low") as PollenLevel;
@@ -354,7 +361,7 @@ export default function Dashboard() {
                       !isNow && !h.isWindowFriendly && (highPollen ? pollenBg(pollen) : "bg-muted border-border")
                     )}
                   >
-                    <span className="text-xs text-muted-foreground font-medium">{h.hour}:00</span>
+                    <span className="text-xs text-muted-foreground font-medium">{formatHour(h.hour)}</span>
                     <span className="text-sm font-semibold">{h.temperature.toFixed(0)}°</span>
                     {hasRain ? (
                       <div className="flex items-center gap-0.5">
