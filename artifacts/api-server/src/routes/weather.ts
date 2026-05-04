@@ -135,7 +135,19 @@ type Settings = {
   maxRainChance: number;
   maxAqi: number;
   indoorTemp: number;
+  indoorTempHeat: number;
+  indoorTempCool: number;
 };
+
+// Pick the effective indoor target based on whether we're in heating or cooling mode.
+// If outdoor temp is below the heat setpoint we're likely heating; above cool setpoint = AC on.
+function effectiveIndoorTemp(outdoorTemp: number, settings: Settings): number {
+  if (outdoorTemp <= settings.indoorTempHeat) return settings.indoorTempHeat; // heating mode
+  if (outdoorTemp >= settings.indoorTempCool) return settings.indoorTempCool; // cooling mode
+  // In between — use whichever is closer to outdoor temp (passive / shoulder season)
+  const midpoint = (settings.indoorTempHeat + settings.indoorTempCool) / 2;
+  return outdoorTemp < midpoint ? settings.indoorTempHeat : settings.indoorTempCool;
+}
 
 function analyzeConditions(
   temp: number,
@@ -151,7 +163,8 @@ function analyzeConditions(
   const issues: string[] = [];
   const positives: string[] = [];
 
-  const outdoorCoolerThanIndoor = temp < settings.indoorTemp;
+  const indoorTarget = effectiveIndoorTemp(temp, settings);
+  const outdoorCoolerThanIndoor = temp < indoorTarget;
 
   // Temperature
   if (temp < settings.minTemp) {
@@ -159,7 +172,7 @@ function analyzeConditions(
   } else if (temp > settings.maxTemp) {
     issues.push(`Too warm outside (${temp.toFixed(0)}°F — importing this heat will make your AC work harder)`);
   } else if (!outdoorCoolerThanIndoor) {
-    issues.push(`Outdoor air (${temp.toFixed(0)}°F) is warmer than your thermostat (${settings.indoorTemp}°F) — won't help cool the house`);
+    issues.push(`Outdoor air (${temp.toFixed(0)}°F) is warmer than your thermostat (${indoorTarget}°F) — won't help cool the house`);
   }
 
   // Humidity
@@ -220,7 +233,7 @@ function analyzeConditions(
         : "Conditions are good — open your window.";
     }
   } else {
-    if (hour >= 10 && hour < 17 && (temp > settings.indoorTemp || humidity > settings.maxHumidity)) {
+    if (hour >= 10 && hour < 17 && (temp > indoorTarget || humidity > settings.maxHumidity)) {
       recommendation = "Midday heat and humidity — let your AC handle it. Try again this evening.";
     } else if (issues.some((r) => r.includes("pollen") || r.includes("Air quality"))) {
       recommendation = "Keep windows closed — outdoor air quality isn't good right now.";

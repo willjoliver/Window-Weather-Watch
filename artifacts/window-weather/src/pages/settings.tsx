@@ -32,6 +32,8 @@ const schema = z.object({
   maxRainChance: z.number().min(0).max(100),
   maxAqi: z.number().min(0).max(200),
   indoorTemp: z.number().min(60).max(85),
+  indoorTempHeat: z.number().min(60).max(85),
+  indoorTempCool: z.number().min(60).max(85),
   workDays: z.array(z.number()).min(1, "Select at least one work day"),
   workStartHour: z.number().min(0).max(23),
   workEndHour: z.number().min(1).max(24),
@@ -67,7 +69,8 @@ export default function Settings() {
     defaultValues: {
       minTemp: 61, maxTemp: 79, maxHumidity: 70, maxWindSpeed: 20,
       maxRainChance: 40, maxAqi: 50, indoorTemp: 72,
-      workDays: [1, 2, 3, 4, 5], workStartHour: 8, workEndHour: 18,
+      indoorTempHeat: 68, indoorTempCool: 74,
+      workDays: [1, 2, 3, 4, 5], workStartHour: 9, workEndHour: 17,
       notificationsEnabled: true, checkIntervalMinutes: 30,
       locationName: null, locationLat: null, locationLon: null,
     },
@@ -80,6 +83,8 @@ export default function Settings() {
         maxHumidity: settings.maxHumidity, maxWindSpeed: settings.maxWindSpeed,
         maxRainChance: settings.maxRainChance, maxAqi: settings.maxAqi,
         indoorTemp: settings.indoorTemp,
+        indoorTempHeat: (settings as any).indoorTempHeat ?? 68,
+        indoorTempCool: (settings as any).indoorTempCool ?? 74,
         workDays: settings.workDays as number[],
         workStartHour: settings.workStartHour, workEndHour: settings.workEndHour,
         notificationsEnabled: settings.notificationsEnabled,
@@ -170,14 +175,24 @@ export default function Settings() {
                   <h2 className="font-semibold text-sm">Temperature (°F)</h2>
                 </div>
                 <div className="space-y-5">
-                  <FormField control={form.control} name="indoorTemp" render={({ field }) => (
+                  <FormField control={form.control} name="indoorTempHeat" render={({ field }) => (
                     <FormItem>
                       <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5 text-muted-foreground" /><FormLabel className="text-sm">Indoor thermostat</FormLabel></div>
+                        <div className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5 text-muted-foreground" /><FormLabel className="text-sm">Heat thermostat</FormLabel></div>
+                        <span className="text-sm font-semibold text-primary">{field.value}°F</span>
+                      </div>
+                      <FormControl><Slider min={60} max={80} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
+                      <FormDescription className="text-xs">Your thermostat setting in winter/heating mode (e.g. 68°F)</FormDescription>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="indoorTempCool" render={({ field }) => (
+                    <FormItem>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5 text-muted-foreground" /><FormLabel className="text-sm">AC thermostat</FormLabel></div>
                         <span className="text-sm font-semibold text-primary">{field.value}°F</span>
                       </div>
                       <FormControl><Slider min={60} max={85} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
-                      <FormDescription className="text-xs">Outdoor air cooler than this will help cool your home</FormDescription>
+                      <FormDescription className="text-xs">Your thermostat setting in summer/cooling mode (e.g. 74°F)</FormDescription>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="minTemp" render={({ field }) => (
@@ -293,7 +308,7 @@ export default function Settings() {
                     <FormItem>
                       <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" /><FormLabel className="text-sm">Start</FormLabel></div>
-                        <span className="text-sm font-semibold text-primary">{field.value}:00</span>
+                        <span className="text-sm font-semibold text-primary">{field.value === 0 ? "12am" : field.value < 12 ? `${field.value}am` : field.value === 12 ? "12pm" : `${field.value - 12}pm`}</span>
                       </div>
                       <FormControl><Slider min={0} max={12} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
                     </FormItem>
@@ -302,7 +317,7 @@ export default function Settings() {
                     <FormItem>
                       <div className="flex justify-between items-center mb-2">
                         <FormLabel className="text-sm">End</FormLabel>
-                        <span className="text-sm font-semibold text-primary">{field.value}:00</span>
+                        <span className="text-sm font-semibold text-primary">{field.value === 0 ? "12am" : field.value < 12 ? `${field.value}am` : field.value === 12 ? "12pm" : `${field.value - 12}pm`}</span>
                       </div>
                       <FormControl><Slider min={12} max={24} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
                     </FormItem>

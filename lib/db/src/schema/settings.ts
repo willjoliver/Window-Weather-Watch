@@ -10,10 +10,12 @@ export const settingsTable = pgTable("settings", {
   maxWindSpeed: real("max_wind_speed").notNull().default(20),
   maxRainChance: integer("max_rain_chance").notNull().default(40),
   maxAqi: integer("max_aqi").notNull().default(50),
-  indoorTemp: real("indoor_temp").notNull().default(72),
+  indoorTemp: real("indoor_temp").notNull().default(72),          // legacy — kept for compat
+  indoorTempHeat: real("indoor_temp_heat").notNull().default(68), // thermostat in heating mode
+  indoorTempCool: real("indoor_temp_cool").notNull().default(74), // thermostat in cooling mode
   workDays: jsonb("work_days").notNull().$type<number[]>().default([1, 2, 3, 4, 5]),
-  workStartHour: integer("work_start_hour").notNull().default(8),
-  workEndHour: integer("work_end_hour").notNull().default(18),
+  workStartHour: integer("work_start_hour").notNull().default(9),
+  workEndHour: integer("work_end_hour").notNull().default(17),
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   checkIntervalMinutes: integer("check_interval_minutes").notNull().default(30),
   locationLat: real("location_lat"),
