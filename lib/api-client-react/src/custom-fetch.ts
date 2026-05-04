@@ -18,6 +18,20 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
 
+// If the Vite/Vercel/Netlify environment exposes a VITE_API_URL at build time,
+// prefer that as the default base URL. This allows the frontend to call a
+// separately hosted API without additional runtime wiring.
+try {
+  // import.meta.env is undefined in some non-ESM contexts; guard access.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const env = (typeof import.meta !== "undefined" ? (import.meta as any).env : undefined);
+  if (env && typeof env.VITE_API_URL === "string" && env.VITE_API_URL.trim() !== "") {
+    _baseUrl = env.VITE_API_URL.replace(/\/+$/, "");
+  }
+} catch {
+  // ignore — environments without import.meta support will just leave _baseUrl null
+}
+
 /**
  * Set a base URL that is prepended to every relative request URL
  * (i.e. paths that start with `/`).
