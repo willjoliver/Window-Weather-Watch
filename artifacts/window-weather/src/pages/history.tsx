@@ -59,7 +59,11 @@ export default function History() {
 
   const mostCommonHour =
     stats?.mostCommonOpenHour != null
-      ? `${stats.mostCommonOpenHour}:00`
+      ? new Date(2000, 0, 1, stats.mostCommonOpenHour).toLocaleString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
       : null;
 
   return (
@@ -136,7 +140,7 @@ export default function History() {
                       {event.temperature != null && (
                         <div className="flex items-center gap-1">
                           <Thermometer className="w-3.5 h-3.5" />
-                          {event.temperature.toFixed(1)}°C
+                          {((event.temperature * 9) / 5 + 32).toFixed(1)}°F
                         </div>
                       )}
                       {event.humidity != null && (
@@ -148,7 +152,7 @@ export default function History() {
                       {event.windSpeed != null && (
                         <div className="flex items-center gap-1">
                           <Wind className="w-3.5 h-3.5" />
-                          {event.windSpeed.toFixed(1)} km/h
+                          {(event.windSpeed * 0.621371).toFixed(1)} mph
                         </div>
                       )}
                     </div>
