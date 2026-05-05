@@ -535,8 +535,8 @@ router.get("/weather/weekly", async (req, res) => {
       return analyzeConditions(h.temp, h.humidity, h.windSpeed, h.weatherCode, h.precipProbability, h.aqi, pl, h.hour, settings).friendly;
     });
 
-    const morningWindowHours = Math.min(5, friendlyHours.filter((h) => h.hour >= 5 && h.hour < 10).length);
-    const eveningWindowHours = Math.min(5, friendlyHours.filter((h) => h.hour >= 17 && h.hour <= 21).length);
+    const morningWindowHours = Math.min(8, friendlyHours.filter((h) => h.hour >= settings.workStartHour && h.hour < settings.workEndHour).length);
+    const eveningWindowHours = Math.min(5, friendlyHours.filter((h) => h.hour >= settings.workEndHour && h.hour <= 22).length);
 
     // Best continuous run
     let bestWindowStart: number | null = null;
@@ -575,9 +575,9 @@ router.get("/weather/weekly", async (req, res) => {
     } else if (strategy === "throughout") {
       overallRecommendation = `Great day — windows can stay open most of the day (${friendlyHours.length} good hours).`;
     } else if (strategy === "both") {
-      overallRecommendation = `Use the open-close strategy: flush the house in the morning (${morningWindowHours}h), close mid-day, reopen in the evening (${eveningWindowHours}h).`;
+      overallRecommendation = `Good conditions during work hours (${morningWindowHours}h) and again in the evening (${eveningWindowHours}h).`;
     } else if (strategy === "morning") {
-      overallRecommendation = `Open windows early morning (${morningWindowHours} good hour${morningWindowHours !== 1 ? "s" : ""}) before the heat builds. Close by mid-morning.`;
+      overallRecommendation = `Open windows during work hours (${morningWindowHours} good hour${morningWindowHours !== 1 ? "s" : ""}) — close before conditions worsen.`;
     } else {
       overallRecommendation = `Evening is the best window (${eveningWindowHours} good hour${eveningWindowHours !== 1 ? "s" : ""}) — conditions improve after the afternoon heat.`;
     }

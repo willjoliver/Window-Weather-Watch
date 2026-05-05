@@ -52,10 +52,15 @@ export default function Forecast() {
     { query: { enabled, queryKey: getGetWeeklyForecastQueryKey({ lat: lat ?? 0, lon: lon ?? 0 }) } }
   );
 
+  const workStart = settings?.workStartHour ?? 9;
+  const workEnd = settings?.workEndHour ?? 17;
+  const workLabel = `${workStart % 12 || 12}${workStart < 12 ? "am" : "pm"}–${workEnd % 12 || 12}${workEnd < 12 ? "am" : "pm"}`;
+  const workSlots = Math.min(8, workEnd - workStart);
+
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-4 md:p-8 max-w-4xl">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <div className="mb-8">
           <h1 className="text-2xl font-semibold">7-Day Forecast</h1>
@@ -155,12 +160,12 @@ export default function Forecast() {
                           <p className="text-sm text-muted-foreground">{day.overallRecommendation}</p>
                         </div>
 
-                        {/* Morning/Evening bars */}
+                        {/* Work Hours/Evening bars */}
                         <div className="shrink-0 flex flex-col gap-1 min-w-[120px]">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-muted-foreground w-14 text-right">Morning</span>
+                            <span className="text-[10px] text-muted-foreground w-14 text-right">Work hrs</span>
                             <div className="flex gap-0.5">
-                              {Array.from({ length: 5 }).map((_, j) => (
+                              {Array.from({ length: workSlots }).map((_, j) => (
                                 <div key={j} className={cn("w-3.5 h-3.5 rounded-sm", j < day.morningWindowHours ? "bg-sky-400" : "bg-muted")} />
                               ))}
                             </div>
@@ -184,8 +189,8 @@ export default function Forecast() {
         {/* Legend */}
         {data && (
           <div className="mt-6 flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 rounded-sm bg-sky-400" /> Morning hours (5–10 am)</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 rounded-sm bg-indigo-400" /> Evening hours (5–9 pm)</div>
+            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 rounded-sm bg-sky-400" /> Work hours ({workLabel})</div>
+            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 rounded-sm bg-indigo-400" /> Evening hours (after {workEnd % 12 || 12}pm)</div>
             <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 rounded-sm bg-muted" /> Not window-friendly</div>
           </div>
         )}

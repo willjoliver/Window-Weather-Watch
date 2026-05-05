@@ -67,7 +67,7 @@ export default function History() {
       : null;
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <div className="mb-8">
           <h1 className="text-2xl font-semibold">History</h1>
@@ -140,7 +140,7 @@ export default function History() {
                       {event.temperature != null && (
                         <div className="flex items-center gap-1">
                           <Thermometer className="w-3.5 h-3.5" />
-                          {((event.temperature * 9) / 5 + 32).toFixed(1)}°F
+                          {event.temperature.toFixed(1)}°F
                         </div>
                       )}
                       {event.humidity != null && (
@@ -152,7 +152,7 @@ export default function History() {
                       {event.windSpeed != null && (
                         <div className="flex items-center gap-1">
                           <Wind className="w-3.5 h-3.5" />
-                          {(event.windSpeed * 0.621371).toFixed(1)} mph
+                          {event.windSpeed.toFixed(1)} mph
                         </div>
                       )}
                     </div>

@@ -14,8 +14,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-60 shrink-0 border-r border-sidebar-border bg-sidebar flex flex-col">
+      {/* Sidebar — hidden on mobile */}
+      <aside className="hidden md:flex w-60 shrink-0 border-r border-sidebar-border bg-sidebar flex-col">
         <div className="px-6 py-6 border-b border-sidebar-border">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
@@ -56,9 +56,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto pb-20 md:pb-0">
         {children}
       </main>
+
+      {/* Bottom nav — mobile only */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background flex">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href;
+          return (
+            <button
+              key={href}
+              onClick={() => navigate(href)}
+              data-testid={`nav-mobile-${label.toLowerCase()}`}
+              className={cn(
+                "flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors",
+                active ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              <Icon className={cn("w-5 h-5", active && "text-primary")} />
+              <span className="leading-none">{label.replace("7-Day ", "")}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
