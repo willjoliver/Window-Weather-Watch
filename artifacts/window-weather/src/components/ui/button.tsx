@@ -5,28 +5,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0" +
-" hover-elevate active-elevate-2",
+  "xp-btn inline-flex items-center justify-center gap-2 whitespace-nowrap disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default:
-           "bg-primary text-primary-foreground border border-primary-border hover:opacity-90 active:opacity-80",
-        destructive:
-          "bg-destructive text-destructive-foreground shadow-sm border-destructive-border hover:opacity-90 active:opacity-80",
-        outline:
-          "border [border-color:var(--button-outline)] shadow-xs active:shadow-none hover:bg-accent hover:text-accent-foreground active:bg-accent/70",
-        secondary:
-          "border bg-secondary text-secondary-foreground border border-secondary-border hover:bg-secondary/70 active:bg-secondary/50",
-        ghost: "border border-transparent hover:bg-accent hover:text-accent-foreground active:bg-accent/70",
-        link: "text-primary underline-offset-4 hover:underline",
+        default:     "xp-btn-primary",
+        destructive: "xp-btn-destructive",
+        outline:     "",
+        secondary:   "",
+        ghost:       "xp-btn-ghost",
+        link:        "shadow-none bg-transparent border-transparent text-[#0000ff] underline-offset-4 hover:underline hover:bg-transparent hover:border-transparent",
       },
       size: {
-        // @replit changed sizes
-        default: "min-h-9 px-4 py-2",
-        sm: "min-h-8 rounded-md px-3 text-xs",
-        lg: "min-h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        default: "min-h-[23px] px-3 py-1 text-[11px]",
+        sm:      "min-h-[21px] px-2 py-0.5 text-[11px]",
+        lg:      "min-h-[25px] px-6 py-1.5 text-[11px]",
+        icon:    "h-[23px] w-[23px] !min-w-0 p-0 text-[11px]",
       },
     },
     defaultVariants: {
