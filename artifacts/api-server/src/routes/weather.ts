@@ -236,12 +236,16 @@ function analyzeConditions(
         : "Conditions are good — open your window.";
     }
   } else {
-    if (hour >= 10 && hour < 17 && (temp > indoorTarget || humidity > settings.maxHumidity)) {
-      recommendation = "Midday heat and humidity — let your AC handle it. Try again this evening.";
+    // If rain or precipitation is present, block opening windows immediately.
+    if (
+      issues.some((r) => r.toLowerCase().includes("rain") || r.includes("Precipitation") || r.includes("storms"))
+    ) {
+      recommendation = "Keep windows closed — rain or precipitation is present.";
     } else if (issues.some((r) => r.includes("pollen") || r.includes("Air quality"))) {
       recommendation = "Keep windows closed — outdoor air quality isn't good right now.";
-    } else if (issues.some((r) => r.includes("rain") || r.includes("Rain") || r.includes("Precipitation"))) {
-      recommendation = "Keep windows closed — rain is in the forecast.";
+    } else if (hour >= 10 && hour < 17 && (temp > indoorTarget || humidity > settings.maxHumidity)) {
+      // Midday heat/humidity is only the controlling reason when precipitation isn't an issue.
+      recommendation = "Midday heat and humidity — let your AC handle it. Try again this evening.";
     } else {
       recommendation = "Keep your window closed for now.";
     }
