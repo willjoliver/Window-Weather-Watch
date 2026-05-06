@@ -142,11 +142,14 @@ type Settings = {
 // Pick the effective indoor target based on whether we're in heating or cooling mode.
 // If outdoor temp is below the heat setpoint we're likely heating; above cool setpoint = AC on.
 function effectiveIndoorTemp(outdoorTemp: number, settings: Settings): number {
-  if (outdoorTemp <= settings.indoorTempHeat) return settings.indoorTempHeat; // heating mode
-  if (outdoorTemp >= settings.indoorTempCool) return settings.indoorTempCool; // cooling mode
-  // In between — use whichever is closer to outdoor temp (passive / shoulder season)
-  const midpoint = (settings.indoorTempHeat + settings.indoorTempCool) / 2;
-  return outdoorTemp < midpoint ? settings.indoorTempHeat : settings.indoorTempCool;
+  // Heating mode: outdoor is cold enough that the furnace is likely running
+  if (outdoorTemp <= settings.indoorTempHeat) return settings.indoorTempHeat;
+  // Cooling mode: outdoor is at or above the AC setpoint
+  if (outdoorTemp >= settings.indoorTempCool) return settings.indoorTempCool;
+  // Shoulder season (between setpoints): compare against the cool setpoint.
+  // Opening a window is only worth it if outdoor air is cooler than the AC target;
+  // the heat setpoint is irrelevant once it's warm enough outside that heat isn't running.
+  return settings.indoorTempCool;
 }
 
 function analyzeConditions(
