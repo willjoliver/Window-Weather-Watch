@@ -28,29 +28,35 @@ router.get("/events/stats", async (req, res) => {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
+  // Oldest-first so we can pair each open with the *next* close in time
   const events = await db.query.windowEventsTable.findMany({
     where: gte(windowEventsTable.createdAt, weekAgo),
     orderBy: [desc(windowEventsTable.createdAt)],
   });
+  const chronological = [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const opens = events.filter((e) => e.action === "opened");
-  const closes = events.filter((e) => e.action === "closed");
 
   let totalDuration = 0;
   let durationCount = 0;
   const daysSet = new Set<string>();
+  const usedCloseIds = new Set<number>();
 
   for (const open of opens) {
-    const nextClose = closes.find(
-      (c) => c.createdAt > open.createdAt
+    // Find the chronologically first close that comes after this open and hasn't been used
+    const nextClose = chronological.find(
+      (c) => c.action === "closed" && c.createdAt > open.createdAt && !usedCloseIds.has(c.id)
     );
     if (nextClose) {
+      usedCloseIds.add(nextClose.id);
       const duration = (nextClose.createdAt.getTime() - open.createdAt.getTime()) / 60000;
       totalDuration += duration;
       durationCount++;
     }
     daysSet.add(open.createdAt.toISOString().split("T")[0]);
   }
+
+  const closes = events.filter((e) => e.action === "closed");
 
   const hourCounts: Record<number, number> = {};
   for (const open of opens) {
