@@ -57,14 +57,22 @@ export default function History() {
         : `${(stats.avgOpenDurationMinutes / 60).toFixed(1)} hr`
       : null;
 
-  const mostCommonHour =
-    stats?.mostCommonOpenHour != null
-      ? new Date(2000, 0, 1, stats.mostCommonOpenHour).toLocaleString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        })
-      : null;
+  // Compute most-common open hour client-side so it uses the browser's local timezone
+  const mostCommonHour = (() => {
+    const opens = events?.filter((e) => e.action === "opened") ?? [];
+    if (opens.length === 0) return null;
+    const hourCounts: Record<number, number> = {};
+    for (const e of opens) {
+      const h = new Date(e.createdAt).getHours();
+      hourCounts[h] = (hourCounts[h] ?? 0) + 1;
+    }
+    const best = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
+    return new Date(2000, 0, 1, Number(best[0])).toLocaleString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  })();
 
   return (
     <div className="p-4 md:p-8 max-w-3xl">
