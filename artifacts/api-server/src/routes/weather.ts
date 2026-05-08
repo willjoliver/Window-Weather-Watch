@@ -316,6 +316,7 @@ async function getSettings() {
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 router.get("/weather/current", async (req, res) => {
+  try {
   const parsed = GetCurrentWeatherQueryParams.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: "lat and lon are required" });
 
@@ -365,6 +366,11 @@ router.get("/weather/current", async (req, res) => {
     reasons,
     timestamp: new Date().toISOString(),
   });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    return res.status(500).json({ error: message, stack });
+  }
 });
 
 router.get("/weather/forecast", async (req, res) => {
