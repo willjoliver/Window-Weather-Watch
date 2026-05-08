@@ -267,7 +267,28 @@ function getTimeOfDayTip(hour: number): string {
 
 // ─── Data Fetching ──────────────────────────────────────────────────────────
 
-async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
+// Cache Open-Meteo responses for 10 minutes to stay well within the 10k/day free limit.
+const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
+const AQ_CACHE_TTL_MS = 10 * 60 * 1000;
+
+interface WeatherCache {
+  data: Awaited<ReturnType<typeof _fetchOpenMeteo>>;
+  cachedAt: number;
+  lat: number;
+  lon: number;
+  forecastDays: number;
+}
+interface AqCache {
+  data: Awaited<ReturnType<typeof _fetchAirQuality>>;
+  cachedAt: number;
+  lat: number;
+  lon: number;
+  forecastDays: number;
+}
+let weatherCache: WeatherCache | null = null;
+let aqCache: AqCache | null = null;
+
+async function _fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
   const url = [
     `https://api.open-meteo.com/v1/forecast`,
     `?latitude=${lat}&longitude=${lon}`,
@@ -289,7 +310,23 @@ async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
   }>;
 }
 
-async function fetchAirQuality(lat: number, lon: number, forecastDays = 1) {
+async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
+  const now = Date.now();
+  if (
+    weatherCache &&
+    now - weatherCache.cachedAt < WEATHER_CACHE_TTL_MS &&
+    weatherCache.forecastDays === forecastDays &&
+    Math.abs(weatherCache.lat - lat) < 0.01 &&
+    Math.abs(weatherCache.lon - lon) < 0.01
+  ) {
+    return weatherCache.data;
+  }
+  const data = await _fetchOpenMeteo(lat, lon, forecastDays);
+  weatherCache = { data, cachedAt: now, lat, lon, forecastDays };
+  return data;
+}
+
+async function _fetchAirQuality(lat: number, lon: number, forecastDays = 1) {
   try {
     const url = [
       `https://air-quality-api.open-meteo.com/v1/air-quality`,
@@ -307,6 +344,22 @@ async function fetchAirQuality(lat: number, lon: number, forecastDays = 1) {
   } catch {
     return null;
   }
+}
+
+async function fetchAirQuality(lat: number, lon: number, forecastDays = 1) {
+  const now = Date.now();
+  if (
+    aqCache &&
+    now - aqCache.cachedAt < AQ_CACHE_TTL_MS &&
+    aqCache.forecastDays === forecastDays &&
+    Math.abs(aqCache.lat - lat) < 0.01 &&
+    Math.abs(aqCache.lon - lon) < 0.01
+  ) {
+    return aqCache.data;
+  }
+  const data = await _fetchAirQuality(lat, lon, forecastDays);
+  aqCache = { data, cachedAt: now, lat, lon, forecastDays };
+  return data;
 }
 
 async function getSettings() {
