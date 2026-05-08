@@ -361,8 +361,8 @@ async function _fetchOpenMeteo(lat: number, lon: number, forecastDays = 1): Prom
     headers: { "User-Agent": "WindowWeatherWatch/1.0 (personal home automation app)" },
   });
   if (!res.ok) {
-    if (res.status === 429 && forecastDays === 1) {
-      // Rate-limited — fall back to Tomorrow.io
+    if (res.status === 429) {
+      // Rate-limited — fall back to Tomorrow.io (supports up to ~5 days hourly)
       return fetchTomorrowWeather(lat, lon);
     }
     const body = await res.text().catch(() => "(unreadable)");
