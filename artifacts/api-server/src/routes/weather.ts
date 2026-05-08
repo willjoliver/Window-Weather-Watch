@@ -267,6 +267,66 @@ function getTimeOfDayTip(hour: number): string {
 
 // ─── Data Fetching ──────────────────────────────────────────────────────────
 
+// Map Tomorrow.io weather codes → approximate WMO codes (used for description + rain detection)
+function tomorrowCodeToWmo(code: number): number {
+  if (code === 1000) return 0;  // Clear
+  if (code <= 1102) return 2;   // Mostly clear / partly cloudy
+  if (code === 1001) return 3;  // Cloudy
+  if (code === 2000 || code === 2100) return 45; // Fog
+  if (code === 4000) return 51; // Drizzle
+  if (code === 4200) return 61; // Light rain
+  if (code === 4001) return 63; // Rain
+  if (code === 4201) return 65; // Heavy rain
+  if (code >= 5000 && code <= 5101) return 71; // Snow
+  if (code >= 6000 && code <= 6201) return 66; // Freezing rain
+  if (code >= 7000 && code <= 7102) return 77; // Ice pellets
+  if (code === 8000) return 95; // Thunderstorm
+  return 3;
+}
+
+type OpenMeteoShape = {
+  current: { time: string; temperature_2m: number; relative_humidity_2m: number; wind_speed_10m: number; weather_code: number };
+  hourly: { time: string[]; temperature_2m: number[]; relative_humidity_2m: number[]; wind_speed_10m: number[]; weather_code: number[]; precipitation_probability: number[] };
+};
+
+async function fetchTomorrowWeather(lat: number, lon: number): Promise<OpenMeteoShape> {
+  const apiKey = process.env.TOMORROW_API_KEY;
+  if (!apiKey) throw new Error("TOMORROW_API_KEY not set");
+  const res = await fetch(
+    `https://api.tomorrow.io/v4/weather/forecast?location=${lat},${lon}&timesteps=1h&units=imperial&apikey=${apiKey}`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Tomorrow.io ${res.status}: ${body}`);
+  }
+  const json = await res.json() as {
+    timelines: {
+      hourly: Array<{ time: string; values: { temperature: number; humidity: number; windSpeed: number; weatherCode: number; precipitationProbability: number } }>;
+    };
+  };
+  const hourly = json.timelines.hourly;
+  // Build an OpenMeteo-shaped object so the rest of the route code is unchanged
+  const now = hourly[0];
+  return {
+    current: {
+      time: now.time.substring(0, 16).replace("T", "T"), // keep ISO format
+      temperature_2m: now.values.temperature,
+      relative_humidity_2m: now.values.humidity,
+      wind_speed_10m: now.values.windSpeed,
+      weather_code: tomorrowCodeToWmo(now.values.weatherCode),
+    },
+    hourly: {
+      time: hourly.map((h) => h.time.substring(0, 16)),
+      temperature_2m: hourly.map((h) => h.values.temperature),
+      relative_humidity_2m: hourly.map((h) => h.values.humidity),
+      wind_speed_10m: hourly.map((h) => h.values.windSpeed),
+      weather_code: hourly.map((h) => tomorrowCodeToWmo(h.values.weatherCode)),
+      precipitation_probability: hourly.map((h) => h.values.precipitationProbability),
+    },
+  };
+}
+
 // Cache Open-Meteo responses for 10 minutes to stay well within the 10k/day free limit.
 const WEATHER_CACHE_TTL_MS = 10 * 60 * 1000;
 const AQ_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -288,7 +348,7 @@ interface AqCache {
 let weatherCache: WeatherCache | null = null;
 let aqCache: AqCache | null = null;
 
-async function _fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
+async function _fetchOpenMeteo(lat: number, lon: number, forecastDays = 1): Promise<OpenMeteoShape> {
   const url = [
     `https://api.open-meteo.com/v1/forecast`,
     `?latitude=${lat}&longitude=${lon}`,
@@ -301,13 +361,14 @@ async function _fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
     headers: { "User-Agent": "WindowWeatherWatch/1.0 (personal home automation app)" },
   });
   if (!res.ok) {
+    if (res.status === 429 && forecastDays === 1) {
+      // Rate-limited — fall back to Tomorrow.io
+      return fetchTomorrowWeather(lat, lon);
+    }
     const body = await res.text().catch(() => "(unreadable)");
     throw new Error(`Open-Meteo ${res.status}: ${body}`);
   }
-  return res.json() as Promise<{
-    current: { time: string; temperature_2m: number; relative_humidity_2m: number; wind_speed_10m: number; weather_code: number };
-    hourly: { time: string[]; temperature_2m: number[]; relative_humidity_2m: number[]; wind_speed_10m: number[]; weather_code: number[]; precipitation_probability: number[] };
-  }>;
+  return res.json() as Promise<OpenMeteoShape>;
 }
 
 async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
