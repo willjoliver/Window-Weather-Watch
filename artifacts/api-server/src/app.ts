@@ -31,4 +31,12 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
+// Temporary: surface error details for debugging
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const message = err instanceof Error ? err.message : String(err);
+  const stack = err instanceof Error ? err.stack : undefined;
+  logger.error({ err }, "unhandled error");
+  res.status(500).json({ error: message, stack });
+});
+
 export default app;
