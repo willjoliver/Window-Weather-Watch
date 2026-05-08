@@ -276,7 +276,9 @@ async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
     `&timezone=auto&forecast_days=${forecastDays}`,
     `&temperature_unit=fahrenheit&wind_speed_unit=mph`,
   ].join("");
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: { "User-Agent": "WindowWeatherWatch/1.0 (personal home automation app)" },
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "(unreadable)");
     throw new Error(`Open-Meteo ${res.status}: ${body}`);
