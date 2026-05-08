@@ -277,7 +277,10 @@ async function fetchOpenMeteo(lat: number, lon: number, forecastDays = 1) {
     `&temperature_unit=fahrenheit&wind_speed_unit=mph`,
   ].join("");
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch weather data");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "(unreadable)");
+    throw new Error(`Open-Meteo ${res.status}: ${body}`);
+  }
   return res.json() as Promise<{
     current: { time: string; temperature_2m: number; relative_humidity_2m: number; wind_speed_10m: number; weather_code: number };
     hourly: { time: string[]; temperature_2m: number[]; relative_humidity_2m: number[]; wind_speed_10m: number[]; weather_code: number[]; precipitation_probability: number[] };
