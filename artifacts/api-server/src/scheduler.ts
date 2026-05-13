@@ -18,23 +18,26 @@ async function checkAndNotify() {
     // Load settings
     const rows = await db.query.settingsTable.findMany({ limit: 1 });
     const settings = rows[0];
-    if (!settings?.locationLat || !settings?.locationLon) return;
-
-    // Check work hours — only notify during work hours on work days
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const hour = now.getHours();
-    const workDays = (settings.workDays as number[]) ?? [1, 2, 3, 4, 5];
-    if (!workDays.includes(dayOfWeek)) return;
-    if (hour < settings.workStartHour || hour >= settings.workEndHour) return;
+    if (!settings?.locationLat || !settings?.locationLon) {
+      logger.info("Scheduler: no location set, skipping");
+      return;
+    }
+    if (!settings.notificationsEnabled) {
+      logger.info("Scheduler: notifications disabled in settings, skipping");
+      return;
+    }
 
     // Fetch current weather from our own API
     const url = `${BASE_URL}/api/weather/current?lat=${settings.locationLat}&lon=${settings.locationLon}`;
     const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      logger.warn({ status: resp.status }, "Scheduler: weather fetch failed");
+      return;
+    }
     const weather = await resp.json() as { isWindowFriendly: boolean; recommendation: string };
 
     const currentState = weather.isWindowFriendly;
+    logger.info({ currentState, lastState }, "Scheduler: weather checked");
 
     // Only notify on state change
     if (lastState === null) {
@@ -53,7 +56,10 @@ async function checkAndNotify() {
 
     // Send to all subscriptions
     const subs = await db.query.pushSubscriptionsTable.findMany();
-    if (subs.length === 0) return;
+    if (subs.length === 0) {
+      logger.info("Scheduler: state changed but no push subscribers");
+      return;
+    }
 
     logger.info({ state: currentState, subscribers: subs.length }, "Sending push notifications");
 

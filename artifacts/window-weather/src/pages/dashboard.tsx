@@ -220,6 +220,19 @@ export default function Dashboard() {
                 {push.state === "subscribed" ? "Push on" : "Push off"}
               </Button>
             )}
+            {push.state === "subscribed" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  await push.sendTest();
+                  toast({ title: "Test notification sent", description: "You should receive it within a few seconds." });
+                }}
+                title="Send a test push notification"
+              >
+                Test
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={toggleMonitoring} className={cn(monitoring && "border-primary text-primary bg-primary/5")}>
               {monitoring ? <Bell className="w-4 h-4 mr-1.5" /> : <BellOff className="w-4 h-4 mr-1.5" />}
               {monitoring ? "Monitoring on" : "Monitor off"}
