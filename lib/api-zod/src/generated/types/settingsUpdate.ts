@@ -14,6 +14,8 @@ export interface SettingsUpdate {
   maxRainChance?: number;
   maxAqi?: number;
   indoorTemp?: number;
+  indoorTempHeat?: number;
+  indoorTempCool?: number;
   workDays?: number[];
   workStartHour?: number;
   workEndHour?: number;

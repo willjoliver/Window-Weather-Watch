@@ -422,6 +422,10 @@ components:
           type: integer
         indoorTemp:
           type: number
+        indoorTempHeat:
+          type: number
+        indoorTempCool:
+          type: number
         workDays:
           type: array
           items:
@@ -452,6 +456,8 @@ components:
         - maxRainChance
         - maxAqi
         - indoorTemp
+        - indoorTempHeat
+        - indoorTempCool
         - workDays
         - workStartHour
         - workEndHour
@@ -477,6 +483,10 @@ components:
         maxAqi:
           type: integer
         indoorTemp:
+          type: number
+        indoorTempHeat:
+          type: number
+        indoorTempCool:
           type: number
         workDays:
           type: array

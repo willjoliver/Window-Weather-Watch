@@ -83,8 +83,8 @@ export default function Settings() {
         maxHumidity: settings.maxHumidity, maxWindSpeed: settings.maxWindSpeed,
         maxRainChance: settings.maxRainChance, maxAqi: settings.maxAqi,
         indoorTemp: settings.indoorTemp,
-        indoorTempHeat: (settings as any).indoorTempHeat ?? 68,
-        indoorTempCool: (settings as any).indoorTempCool ?? 74,
+        indoorTempHeat: settings.indoorTempHeat ?? 68,
+        indoorTempCool: settings.indoorTempCool ?? 74,
         workDays: settings.workDays as number[],
         workStartHour: settings.workStartHour, workEndHour: settings.workEndHour,
         notificationsEnabled: settings.notificationsEnabled,
@@ -213,6 +213,16 @@ export default function Settings() {
                       </div>
                       <FormControl><Slider min={60} max={105} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
                       <FormDescription className="text-xs">Too hot above this — importing heat makes AC work harder</FormDescription>
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="indoorTemp" render={({ field }) => (
+                    <FormItem>
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-1.5"><Home className="w-3.5 h-3.5 text-muted-foreground" /><FormLabel className="text-sm">Indoor reference temp</FormLabel></div>
+                        <span className="text-sm font-semibold text-primary">{field.value}°F</span>
+                      </div>
+                      <FormControl><Slider min={60} max={85} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
+                      <FormDescription className="text-xs">Used for the "cooler/warmer than inside" comparison on the dashboard</FormDescription>
                     </FormItem>
                   )} />
                 </div>
@@ -346,7 +356,7 @@ export default function Settings() {
                       <FormLabel className="text-sm">Check interval</FormLabel>
                       <span className="text-sm font-semibold text-primary">every {field.value} min</span>
                     </div>
-                    <FormControl><Slider min={5} max={60} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
+                    <FormControl><Slider min={5} max={120} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} /></FormControl>
                   </FormItem>
                 )} />
               </Card>

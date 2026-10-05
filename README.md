@@ -34,7 +34,9 @@ Deploy notes
 Important: notifications
 
 - The app uses the browser Notification API. For permission to be granted and to actually receive notifications the site must be served over HTTPS.
-- The current implementation requests permission on user interaction (the Monitor button) — that's correct. However, browser push notifications while the tab is closed require implementing the Push API and a service worker with a push subscription (not yet implemented).
+- Two notification modes:
+  - **Monitor mode** (frontend): toggle "Monitor" on the dashboard to poll weather every N minutes (per `checkIntervalMinutes`) while the tab is open. Alerts fire as in-app toasts and via the Notification API when conditions change.
+  - **Background push** (server): toggle "Push" on the dashboard to subscribe through the Push API + service worker (VAPID keys). The API server's scheduler (`artifacts/api-server/src/scheduler.ts`) re-checks weather on the configured interval and sends a web push to all subscribers whenever the window-friendly state flips, even with the tab closed. Requires `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` on the server. A Test button on the dashboard verifies delivery.
 
 Recommended minimal deploy flow
 
@@ -42,4 +44,4 @@ Recommended minimal deploy flow
 2. Deploy `artifacts/api-server` to Railway/Render; set `DATABASE_URL`.
 3. Build and deploy `artifacts/window-weather` to Vercel/Netlify; set `VITE_API_URL` to the deployed API URL.
 
-If you'd like, I can open a PR to: (a) add a small service worker + Push subscription flow, (b) add deployment GitHub Actions, or (c) make the frontend warn when Notification permission cannot be requested due to insecure context.
+If you'd like, I can open a PR to: (a) add deployment GitHub Actions, or (b) make the frontend warn when Notification permission cannot be requested due to insecure context.

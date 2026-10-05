@@ -436,7 +436,7 @@ export default function Dashboard() {
         {settings && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
             <Clock className="w-3.5 h-3.5" />
-            <span>Monitoring during work hours: {settings.workStartHour}:00 – {settings.workEndHour}:00 on work days</span>
+            <span>Notifications fire on any change, day or night · Work hours {settings.workStartHour}:00–{settings.workEndHour}:00 shape the forecast</span>
             <button onClick={() => window.location.href = "/settings"} className="flex items-center gap-0.5 text-primary hover:underline ml-1">
               Change <ChevronRight className="w-3 h-3" />
             </button>

@@ -487,8 +487,7 @@ router.get("/weather/current", async (req, res) => {
   });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : undefined;
-    return res.status(500).json({ error: message, stack });
+    return res.status(500).json({ error: message });
   }
 });
 
