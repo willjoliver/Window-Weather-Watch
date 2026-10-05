@@ -377,8 +377,8 @@ export default function Dashboard() {
                 onClick={() => logWindowAction("opened")}
                 disabled={createEvent.isPending || !enabled}
                 className={cn(
-                  "bg-white/15 text-white border border-white/20 hover:bg-white/25 backdrop-blur-sm",
-                  windowState === "open" && "bg-white text-slate-900 hover:bg-white/90 border-transparent"
+                  "bg-white text-slate-900 hover:bg-white/85 border border-transparent shadow-sm",
+                  windowState === "open" && "bg-slate-900 text-white hover:bg-slate-800"
                 )}
               >
                 Log open
@@ -388,8 +388,8 @@ export default function Dashboard() {
                 onClick={() => logWindowAction("closed")}
                 disabled={createEvent.isPending || !enabled}
                 className={cn(
-                  "bg-white/15 text-white border border-white/20 hover:bg-white/25 backdrop-blur-sm",
-                  windowState === "closed" && "bg-white text-slate-900 hover:bg-white/90 border-transparent"
+                  "bg-white text-slate-900 hover:bg-white/85 border border-transparent shadow-sm",
+                  windowState === "closed" && "bg-slate-900 text-white hover:bg-slate-800"
                 )}
               >
                 Log closed
