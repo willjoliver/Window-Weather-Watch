@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Thermometer, Droplets, Wind, Clock, RefreshCw,
-  BellOff, Bell, MapPin, CheckCircle, XCircle, ChevronRight,
-  CloudRain, Leaf, Wind as WindIcon, Info, BellRing
+  Thermometer, Droplets, Clock, RefreshCw,
+  BellOff, Bell, MapPin, ChevronRight,
+  CloudRain, Leaf, Wind as WindIcon, Info, BellRing,
+  Sun, Moon, Cloud, CloudFog, CloudSnow, CloudLightning,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePush } from "@/hooks/use-push";
@@ -51,6 +51,48 @@ function aqiLabel(aqi: number) {
   if (aqi <= 100) return { text: "Moderate", cls: "text-yellow-600" };
   if (aqi <= 150) return { text: "Sensitive", cls: "text-orange-600" };
   return { text: "Unhealthy", cls: "text-red-600" };
+}
+
+type SkyKind =
+  | "clear-day" | "clear-night"
+  | "cloudy-day" | "cloudy-night"
+  | "fog" | "rain" | "snow" | "storm";
+
+function skyKind(code: number | undefined, hour: number): SkyKind {
+  const isDay = hour >= 6 && hour < 20;
+  if (code === undefined) return isDay ? "cloudy-day" : "cloudy-night";
+  if (code === 0) return isDay ? "clear-day" : "clear-night";
+  if (code === 1 || code === 2 || code === 3) return isDay ? "cloudy-day" : "cloudy-night";
+  if (code === 45 || code === 48) return "fog";
+  if (code >= 51 && code <= 67) return "rain";
+  if (code >= 71 && code <= 77) return "snow";
+  if (code >= 80 && code <= 82) return "rain";
+  if (code >= 95) return "storm";
+  return isDay ? "cloudy-day" : "cloudy-night";
+}
+
+const SKY_GRADIENTS: Record<SkyKind, string> = {
+  "clear-day": "from-sky-600 via-sky-500 to-cyan-400",
+  "clear-night": "from-indigo-950 via-[#232046] to-slate-900",
+  "cloudy-day": "from-slate-600 via-slate-500 to-slate-400",
+  "cloudy-night": "from-slate-900 via-slate-800 to-slate-700",
+  fog: "from-stone-600 via-stone-500 to-stone-400",
+  rain: "from-cyan-950 via-slate-800 to-cyan-900",
+  snow: "from-sky-800 via-sky-700 to-indigo-600",
+  storm: "from-violet-950 via-slate-900 to-indigo-950",
+};
+
+function SkyIcon({ kind, className }: { kind: SkyKind; className?: string }) {
+  switch (kind) {
+    case "clear-day": return <Sun className={className} />;
+    case "clear-night": return <Moon className={className} />;
+    case "cloudy-day":
+    case "cloudy-night": return <Cloud className={className} />;
+    case "fog": return <CloudFog className={className} />;
+    case "rain": return <CloudRain className={className} />;
+    case "snow": return <CloudSnow className={className} />;
+    case "storm": return <CloudLightning className={className} />;
+  }
 }
 
 function MetricCard({
@@ -154,6 +196,7 @@ export default function Dashboard() {
   const friendly = weather?.isWindowFriendly;
   const nowHour = new Date().getHours();
   const hourlyItems = forecast?.hours ?? [];
+  const sky = skyKind(weather?.weatherCode, nowHour);
 
   function formatHour(hour: number): string {
     if (hour === 0) return "12am";
@@ -168,12 +211,17 @@ export default function Dashboard() {
   const maxRainChance = settings?.maxRainChance ?? 40;
   const maxAqi = settings?.maxAqi ?? 50;
 
+  const temps = hourlyItems.map((h) => h.temperature);
+  const minT = temps.length ? Math.min(...temps) : 0;
+  const maxT = temps.length ? Math.max(...temps) : 1;
+  const tSpan = Math.max(maxT - minT, 1);
+
   return (
     <div className="p-4 md:p-8 max-w-4xl">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">
               Good{nowHour < 12 ? " morning" : nowHour < 18 ? " afternoon" : " evening"}
@@ -257,95 +305,137 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* Main status card */}
-        <Card className="p-6 mb-5 overflow-hidden relative">
-          <div className={cn("absolute inset-0 opacity-5 transition-colors duration-700", friendly ? "bg-emerald-500" : "bg-slate-400")} />
+        {/* Hero — the verdict, big */}
+        <div className={cn("rounded-3xl p-6 md:p-8 mb-5 text-white relative overflow-hidden bg-gradient-to-br transition-all duration-700", SKY_GRADIENTS[sky])}>
+          <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-28 -left-16 w-72 h-72 rounded-full bg-black/10 blur-3xl pointer-events-none" />
           <div className="relative">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex-1 min-w-0">
-                {weatherLoading || settingsLoading ? (
-                  <>
-                    <Skeleton className="h-8 w-48 mb-2" />
-                    <Skeleton className="h-4 w-64" />
-                  </>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-white/75 text-sm mb-2">
+                  <SkyIcon kind={sky} className="w-4 h-4" />
+                  <span>{weatherLoading ? "Reading the sky…" : weather?.weatherDescription ?? "Set a location to begin"}</span>
+                </div>
+                <AnimatePresence mode="wait">
+                  <motion.h2
+                    key={String(friendly)}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-4xl md:text-5xl font-bold tracking-tight leading-none"
+                  >
+                    {weatherLoading
+                      ? "Checking…"
+                      : !enabled
+                        ? "Set a location"
+                        : friendly
+                          ? "Open the windows"
+                          : "Keep them closed"}
+                  </motion.h2>
+                </AnimatePresence>
+                {!weatherLoading && weather?.recommendation && (
+                  <p className="text-white/85 mt-3 max-w-lg leading-relaxed">{weather.recommendation}</p>
+                )}
+              </div>
+              <div className="text-right shrink-0">
+                {weatherLoading ? (
+                  <Skeleton className="h-16 w-24 bg-white/20" />
                 ) : (
-                  <AnimatePresence mode="wait">
-                    <motion.div key={String(friendly)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
-                      <div className="flex items-center gap-2 mb-2">
-                        {weather && (friendly
-                          ? <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                          : <XCircle className="w-5 h-5 text-muted-foreground shrink-0" />
-                        )}
-                        <h2 className="text-lg font-semibold leading-tight">
-                          {weather?.recommendation ?? (enabled ? "Checking weather…" : "Set a location to begin")}
-                        </h2>
+                  <>
+                    <div className="text-6xl md:text-7xl font-bold tracking-tight leading-none">
+                      {weather?.temperature?.toFixed(0) ?? "—"}°
+                    </div>
+                    {settings && weather && (
+                      <div className="text-white/70 text-xs mt-1.5">
+                        {weather.temperature < settings.indoorTemp ? "↓ cooler than inside" : "↑ warmer than inside"}
                       </div>
-                      {weather?.timeOfDayTip && !friendly && (
-                        <div className="flex items-start gap-1.5 mb-2">
-                          <Info className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <p className="text-xs text-muted-foreground">{weather.timeOfDayTip}</p>
-                        </div>
-                      )}
-                      {weather && (
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          {weather.reasons?.map((r, i) => (
-                            <Badge key={i} variant={friendly ? "default" : "secondary"} className="text-xs font-normal">{r}</Badge>
-                          ))}
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+                    )}
+                  </>
                 )}
-              </div>
-              <div className="flex gap-2 shrink-0 ml-4">
-                <Button size="sm" variant={windowState === "open" ? "default" : "outline"} onClick={() => logWindowAction("opened")} disabled={createEvent.isPending || !enabled}>Open</Button>
-                <Button size="sm" variant={windowState === "closed" ? "default" : "outline"} onClick={() => logWindowAction("closed")} disabled={createEvent.isPending || !enabled}>Close</Button>
               </div>
             </div>
 
-            {/* Metrics grid */}
-            <div className="grid grid-cols-3 gap-x-6 gap-y-4 pt-4 border-t border-border">
-              <MetricCard icon={Thermometer} label="Temperature" loading={weatherLoading}>
-                <span className="text-2xl font-semibold">{weather?.temperature?.toFixed(1) ?? "—"}</span>
-                <span className="text-sm text-muted-foreground ml-1">°F</span>
-                {settings && weather && (
-                  <span className={cn("text-xs ml-2", weather.temperature < settings.indoorTemp ? "text-emerald-600" : "text-orange-500")}>
-                    {weather.temperature < settings.indoorTemp ? "↓ cooler than inside" : "↑ warmer than inside"}
-                  </span>
+            {weather?.timeOfDayTip && !friendly && (
+              <div className="flex items-start gap-1.5 mt-4">
+                <Info className="w-3.5 h-3.5 text-white/70 mt-0.5 shrink-0" />
+                <p className="text-sm text-white/80">{weather.timeOfDayTip}</p>
+              </div>
+            )}
+
+            {weather && (weather.reasons?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-4">
+                {weather.reasons!.map((r, i) => (
+                  <span key={i} className="text-xs font-normal px-2.5 py-1 rounded-full bg-white/15 border border-white/10 backdrop-blur-sm">{r}</span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-5">
+              <Button
+                size="sm"
+                onClick={() => logWindowAction("opened")}
+                disabled={createEvent.isPending || !enabled}
+                className={cn(
+                  "bg-white/15 text-white border border-white/20 hover:bg-white/25 backdrop-blur-sm",
+                  windowState === "open" && "bg-white text-slate-900 hover:bg-white/90 border-transparent"
                 )}
-              </MetricCard>
-
-              <MetricCard icon={Droplets} label="Humidity" loading={weatherLoading}>
-                <span className="text-2xl font-semibold">{weather?.humidity?.toFixed(0) ?? "—"}</span>
-                <span className="text-sm text-muted-foreground ml-1">%</span>
-              </MetricCard>
-
-              <MetricCard icon={WindIcon} label="Wind" loading={weatherLoading}>
-                <span className="text-2xl font-semibold">{weather?.windSpeed?.toFixed(0) ?? "—"}</span>
-                <span className="text-sm text-muted-foreground ml-1">mph</span>
-                {weather && weather.windSpeed >= 3 && weather.windSpeed <= (settings?.maxWindSpeed ?? 20) && (
-                  <span className="text-xs ml-2 text-emerald-600">good for cross-ventilation</span>
+              >
+                Log open
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => logWindowAction("closed")}
+                disabled={createEvent.isPending || !enabled}
+                className={cn(
+                  "bg-white/15 text-white border border-white/20 hover:bg-white/25 backdrop-blur-sm",
+                  windowState === "closed" && "bg-white text-slate-900 hover:bg-white/90 border-transparent"
                 )}
-              </MetricCard>
-
-              <MetricCard icon={CloudRain} label="Rain chance" loading={weatherLoading} iconClass={rainChance > maxRainChance ? "text-sky-500" : undefined}>
-                <span className={cn("text-2xl font-semibold", rainChance > maxRainChance && "text-sky-600 dark:text-sky-400")}>
-                  {rainChance}
-                </span>
-                <span className="text-sm text-muted-foreground ml-1">%</span>
-              </MetricCard>
-
-              <MetricCard icon={WindIcon} label="Air quality" loading={weatherLoading}>
-                <span className={cn("text-2xl font-semibold", aqiInfo.cls)}>{aqi}</span>
-                <span className={cn("text-sm ml-2 font-medium", aqiInfo.cls)}>{aqiInfo.text}</span>
-              </MetricCard>
-
-              <MetricCard icon={Leaf} label="Pollen" loading={weatherLoading}>
-                <span className={cn("text-lg font-semibold capitalize", pollenColor(pollenLevel))}>
-                  {pollenLevel.replace("-", " ")}
-                </span>
-              </MetricCard>
+              >
+                Log closed
+              </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Metrics grid */}
+        <Card className="p-5 mb-5">
+          <div className="grid grid-cols-3 gap-x-6 gap-y-4">
+            <MetricCard icon={Thermometer} label="Feels like" loading={weatherLoading}>
+              <span className="text-2xl font-semibold">{weather?.temperature?.toFixed(1) ?? "—"}</span>
+              <span className="text-sm text-muted-foreground ml-1">°F</span>
+            </MetricCard>
+
+            <MetricCard icon={Droplets} label="Humidity" loading={weatherLoading}>
+              <span className="text-2xl font-semibold">{weather?.humidity?.toFixed(0) ?? "—"}</span>
+              <span className="text-sm text-muted-foreground ml-1">%</span>
+            </MetricCard>
+
+            <MetricCard icon={WindIcon} label="Wind" loading={weatherLoading}>
+              <span className="text-2xl font-semibold">{weather?.windSpeed?.toFixed(0) ?? "—"}</span>
+              <span className="text-sm text-muted-foreground ml-1">mph</span>
+              {weather && weather.windSpeed >= 3 && weather.windSpeed <= (settings?.maxWindSpeed ?? 20) && (
+                <span className="text-xs ml-2 text-emerald-600">good for cross-ventilation</span>
+              )}
+            </MetricCard>
+
+            <MetricCard icon={CloudRain} label="Rain chance" loading={weatherLoading} iconClass={rainChance > maxRainChance ? "text-sky-500" : undefined}>
+              <span className={cn("text-2xl font-semibold", rainChance > maxRainChance && "text-sky-600 dark:text-sky-400")}>
+                {rainChance}
+              </span>
+              <span className="text-sm text-muted-foreground ml-1">%</span>
+            </MetricCard>
+
+            <MetricCard icon={WindIcon} label="Air quality" loading={weatherLoading}>
+              <span className={cn("text-2xl font-semibold", aqiInfo.cls)}>{aqi}</span>
+              <span className={cn("text-sm ml-2 font-medium", aqiInfo.cls)}>{aqiInfo.text}</span>
+            </MetricCard>
+
+            <MetricCard icon={Leaf} label="Pollen" loading={weatherLoading}>
+              <span className={cn("text-lg font-semibold capitalize", pollenColor(pollenLevel))}>
+                {pollenLevel.replace("-", " ")}
+              </span>
+            </MetricCard>
           </div>
         </Card>
 
@@ -375,50 +465,55 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* Hourly forecast */}
+        {/* Hourly forecast — temperature timeline */}
         <Card className="p-5 mb-5">
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">Hourly forecast</h3>
           {forecastLoading || (enabled && hourlyItems.length === 0) ? (
-            <div className="flex gap-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 w-16 rounded-lg" />)}</div>
+            <div className="flex gap-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 w-10 rounded-lg" />)}</div>
           ) : !enabled ? (
             <p className="text-sm text-muted-foreground py-4 text-center">Set a location to see the forecast.</p>
           ) : (
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex items-end gap-1.5 overflow-x-auto pb-2 pt-1">
               {hourlyItems.map((h, i) => {
                 const isNow = h.hour === nowHour;
                 const hasRain = h.precipitationProbability > maxRainChance;
                 const pollen = h.pollenLevel as PollenLevel;
                 const highPollen = pollen === "high" || pollen === "very-high";
-                const hourAqiInfo = aqiLabel(h.airQualityIndex);
+                const barH = 14 + ((h.temperature - minT) / tSpan) * 52;
 
                 return (
                   <motion.div
                     key={h.hour}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className={cn(
-                      "shrink-0 w-16 rounded-xl flex flex-col items-center gap-1 py-2.5 px-1.5 border text-center",
-                      isNow && "border-primary bg-primary/5",
-                      !isNow && h.isWindowFriendly && "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
-                      !isNow && !h.isWindowFriendly && (highPollen ? pollenBg(pollen) : "bg-muted border-border")
-                    )}
+                    transition={{ delay: Math.min(i * 0.03, 0.5) }}
+                    className="flex flex-col items-center gap-1 shrink-0 w-10"
+                    title={`${formatHour(h.hour)}: ${h.temperature.toFixed(0)}°F${hasRain ? `, ${h.precipitationProbability}% rain` : ""}${highPollen ? `, ${pollen} pollen` : ""}`}
                   >
-                    <span className="text-xs text-muted-foreground font-medium">{formatHour(h.hour)}</span>
-                    <span className="text-sm font-semibold">{h.temperature.toFixed(0)}°</span>
-                    {hasRain ? (
-                      <div className="flex items-center gap-0.5">
+                    <span className={cn("text-[11px] font-semibold", isNow && "text-primary")}>{h.temperature.toFixed(0)}°</span>
+                    <div
+                      style={{ height: `${barH}px` }}
+                      className={cn(
+                        "w-5 rounded-full transition-colors",
+                        isNow
+                          ? "bg-primary"
+                          : h.isWindowFriendly
+                            ? "bg-emerald-500/90"
+                            : "bg-muted-foreground/25"
+                      )}
+                    />
+                    <span className={cn("text-[10px] text-muted-foreground", isNow && "text-primary font-semibold")}>
+                      {isNow ? "Now" : formatHour(h.hour)}
+                    </span>
+                    <div className="h-3.5 flex items-center">
+                      {hasRain ? (
                         <CloudRain className="w-3 h-3 text-sky-500" />
-                        <span className="text-xs text-sky-600 dark:text-sky-400">{h.precipitationProbability}%</span>
-                      </div>
-                    ) : highPollen ? (
-                      <Leaf className={cn("w-3 h-3", pollenColor(pollen))} />
-                    ) : (
-                      <div className={cn("w-2 h-2 rounded-full", h.isWindowFriendly ? "bg-emerald-500" : "bg-muted-foreground/30")} />
-                    )}
-                    {h.airQualityIndex > maxAqi && (
-                      <span className={cn("text-[10px] leading-none font-medium", hourAqiInfo.cls)}>AQI {h.airQualityIndex}</span>
-                    )}
+                      ) : highPollen ? (
+                        <Leaf className={cn("w-3 h-3", pollenColor(pollen))} />
+                      ) : h.airQualityIndex > maxAqi ? (
+                        <span className={cn("text-[9px] font-medium", aqiLabel(h.airQualityIndex).cls)}>AQI</span>
+                      ) : null}
+                    </div>
                   </motion.div>
                 );
               })}
@@ -426,9 +521,9 @@ export default function Dashboard() {
           )}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500" /> Window-friendly</div>
+            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary" /> Now</div>
             <div className="flex items-center gap-1.5"><CloudRain className="w-3 h-3 text-sky-500" /> Rain</div>
             <div className="flex items-center gap-1.5"><Leaf className="w-3 h-3 text-orange-500" /> High pollen</div>
-            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-muted-foreground/30" /> Not recommended</div>
           </div>
         </Card>
 
