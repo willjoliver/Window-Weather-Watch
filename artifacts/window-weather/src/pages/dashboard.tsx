@@ -61,13 +61,13 @@ function skyKind(code: number | undefined, hour: number): SkyKind {
 }
 
 const SKY_GRADIENTS: Record<SkyKind, string> = {
-  "clear-day": "from-sky-500 via-sky-400 to-cyan-300",
+  "clear-day": "from-sky-700 via-sky-600 to-blue-500",
   "clear-night": "from-indigo-950 via-[#232046] to-slate-900",
-  "cloudy-day": "from-slate-500 via-slate-400 to-slate-300",
+  "cloudy-day": "from-slate-700 via-slate-600 to-slate-500",
   "cloudy-night": "from-slate-900 via-slate-800 to-slate-700",
-  fog: "from-stone-500 via-stone-400 to-stone-300",
-  rain: "from-cyan-950 via-slate-800 to-cyan-900",
-  snow: "from-sky-700 via-sky-600 to-indigo-500",
+  fog: "from-stone-700 via-stone-600 to-stone-500",
+  rain: "from-slate-900 via-cyan-950 to-slate-800",
+  snow: "from-sky-900 via-sky-800 to-indigo-700",
   storm: "from-violet-950 via-slate-900 to-indigo-950",
 };
 
@@ -89,8 +89,8 @@ function GlassCard({ className, children }: { className?: string; children: Reac
   return (
     <div
       className={cn(
-        "rounded-3xl border border-white/25 bg-white/[0.12] backdrop-blur-2xl",
-        "shadow-[0_8px_32px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.35)]",
+        "rounded-3xl border border-white/30 bg-white/[0.16] backdrop-blur-2xl",
+        "shadow-[0_8px_32px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,255,255,0.4)]",
         className
       )}
     >
@@ -139,7 +139,7 @@ function GlassMetric({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-white/60 text-[11px] font-medium uppercase tracking-wider">
+      <div className="flex items-center gap-1.5 text-white/75 text-[11px] font-medium uppercase tracking-wider">
         <Icon className="w-3.5 h-3.5" />
         {label}
       </div>
@@ -431,17 +431,17 @@ export default function Dashboard() {
           <div className="grid grid-cols-3 gap-x-6 gap-y-5">
             <GlassMetric icon={Thermometer} label="Feels like" loading={weatherLoading}>
               <span className="text-2xl font-semibold">{weather?.temperature?.toFixed(1) ?? "—"}</span>
-              <span className="text-sm text-white/60 ml-1">°F</span>
+              <span className="text-sm text-white/75 ml-1">°F</span>
             </GlassMetric>
 
             <GlassMetric icon={Droplets} label="Humidity" loading={weatherLoading}>
               <span className="text-2xl font-semibold">{weather?.humidity?.toFixed(0) ?? "—"}</span>
-              <span className="text-sm text-white/60 ml-1">%</span>
+              <span className="text-sm text-white/75 ml-1">%</span>
             </GlassMetric>
 
             <GlassMetric icon={WindIcon} label="Wind" loading={weatherLoading}>
               <span className="text-2xl font-semibold">{weather?.windSpeed?.toFixed(0) ?? "—"}</span>
-              <span className="text-sm text-white/60 ml-1">mph</span>
+              <span className="text-sm text-white/75 ml-1">mph</span>
               {weather && weather.windSpeed >= 3 && weather.windSpeed <= (settings?.maxWindSpeed ?? 20) && (
                 <span className="text-xs ml-2 text-emerald-200">good for cross-ventilation</span>
               )}
@@ -451,7 +451,7 @@ export default function Dashboard() {
               <span className={cn("text-2xl font-semibold", rainChance > maxRainChance ? "text-sky-200" : "text-white")}>
                 {rainChance}
               </span>
-              <span className="text-sm text-white/60 ml-1">%</span>
+              <span className="text-sm text-white/75 ml-1">%</span>
             </GlassMetric>
 
             <GlassMetric icon={WindIcon} label="Air quality" loading={weatherLoading}>
@@ -471,7 +471,7 @@ export default function Dashboard() {
         {!summaryLoading && summary && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             <GlassCard className="p-5 mb-5">
-              <h3 className="text-[11px] font-semibold text-white/60 uppercase tracking-wider mb-3">Today's strategy</h3>
+              <h3 className="text-[11px] font-semibold text-white/75 uppercase tracking-wider mb-3">Today's strategy</h3>
               <p className="text-[15px] text-white mb-3 leading-relaxed">{summary.overallRecommendation}</p>
               <div className="flex flex-wrap gap-6 text-sm">
                 <div>
@@ -495,7 +495,7 @@ export default function Dashboard() {
 
         {/* Hourly forecast */}
         <GlassCard className="p-5 mb-5">
-          <h3 className="text-[11px] font-semibold text-white/60 uppercase tracking-wider mb-4">Hourly forecast</h3>
+          <h3 className="text-[11px] font-semibold text-white/75 uppercase tracking-wider mb-4">Hourly forecast</h3>
           {forecastLoading || (enabled && hourlyItems.length === 0) ? (
             <div className="flex gap-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 w-10 rounded-lg bg-white/20" />)}</div>
           ) : !enabled ? (
